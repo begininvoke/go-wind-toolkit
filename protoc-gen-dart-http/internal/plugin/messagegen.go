@@ -42,20 +42,28 @@ func (m messageGenerator) Generate(f *codegen.File) {
 	f.P()
 
 	// Constructor
-	f.P(t(1), className, "({")
-	for _, field := range fields {
-		f.P(t(2), "this.", dartFieldName(field.JSONName()), ",")
+	if len(fields) == 0 {
+		f.P(t(1), className, "();")
+	} else {
+		f.P(t(1), className, "({")
+		for _, field := range fields {
+			f.P(t(2), "this.", dartFieldName(field.JSONName()), ",")
+		}
+		f.P(t(1), "});")
 	}
-	f.P(t(1), "});")
 	f.P()
 
 	// fromJson
 	f.P(t(1), "factory ", className, ".fromJson(Map<String, dynamic> json) {")
-	f.P(t(2), "return ", className, "(")
-	for _, field := range fields {
-		f.P(t(3), dartFieldName(field.JSONName()), ": ", fromJsonExpr(m.pkg, field), ",")
+	if len(fields) == 0 {
+		f.P(t(2), "return ", className, "();")
+	} else {
+		f.P(t(2), "return ", className, "(")
+		for _, field := range fields {
+			f.P(t(3), dartFieldName(field.JSONName()), ": ", fromJsonExpr(m.pkg, field), ",")
+		}
+		f.P(t(2), ");")
 	}
-	f.P(t(2), ");")
 	f.P(t(1), "}")
 	f.P()
 
@@ -101,34 +109,44 @@ func (m messageGenerator) Generate(f *codegen.File) {
 
 	// hashCode
 	f.P(t(1), "@override")
-	f.P(t(1), "int get hashCode => Object.hashAll([")
-	for _, field := range fields {
-		fname := dartFieldName(field.JSONName())
-		f.P(t(2), fname, ",")
+	if len(fields) == 0 {
+		f.P(t(1), "int get hashCode => Object.hashAll([]);")
+	} else {
+		f.P(t(1), "int get hashCode => Object.hashAll([")
+		for _, field := range fields {
+			fname := dartFieldName(field.JSONName())
+			f.P(t(2), fname, ",")
+		}
+		f.P(t(1), "]);")
 	}
-	f.P(t(1), "]);")
 	f.P()
 
 	// copyWith
-	f.P(t(1), className, " copyWith({")
-	for _, field := range fields {
-		fieldType := typeFromField(m.pkg, field)
-		ref := fieldType.Reference()
-		fname := dartFieldName(field.JSONName())
-		if isNullableDartType(ref) {
-			f.P(t(2), ref, "? ", fname, ",")
-		} else {
-			f.P(t(2), ref, " ", fname, ",")
+	if len(fields) == 0 {
+		f.P(t(1), className, " copyWith() {")
+		f.P(t(2), "return ", className, "();")
+		f.P(t(1), "}")
+	} else {
+		f.P(t(1), className, " copyWith({")
+		for _, field := range fields {
+			fieldType := typeFromField(m.pkg, field)
+			ref := fieldType.Reference()
+			fname := dartFieldName(field.JSONName())
+			if isNullableDartType(ref) {
+				f.P(t(2), ref, "? ", fname, ",")
+			} else {
+				f.P(t(2), ref, " ", fname, ",")
+			}
 		}
+		f.P(t(1), "}) {")
+		f.P(t(2), "return ", className, "(")
+		for _, field := range fields {
+			fname := dartFieldName(field.JSONName())
+			f.P(t(3), fname, ": ", fname, " ?? this.", fname, ",")
+		}
+		f.P(t(2), ");")
+		f.P(t(1), "}")
 	}
-	f.P(t(1), "}) {")
-	f.P(t(2), "return ", className, "(")
-	for _, field := range fields {
-		fname := dartFieldName(field.JSONName())
-		f.P(t(3), fname, ": ", fname, " ?? this.", fname, ",")
-	}
-	f.P(t(2), ");")
-	f.P(t(1), "}")
 
 	f.P("}")
 	f.P()

@@ -39,7 +39,7 @@ export function ExportConfigToRemote(arg1:configexporter.RemoteConfig):Promise<c
 
 export function ExportOneServiceConfig(arg1:configexporter.RemoteConfig,arg2:string):Promise<configexporter.ExportResult>;
 
-export function GenerateFrontendCode(arg1:string,arg2:string):Promise<string>;
+export function GenerateFrontendCode(arg1:string,arg2:main.FrontendGenParams):Promise<main.FrontendWriteResult>;
 
 export function GenerateGrpcCode(arg1:string,arg2:string):Promise<string>;
 
@@ -70,6 +70,10 @@ export function ImportDatabaseTables(arg1:database.DBConfig):Promise<string>;
 export function ImportSqlTables(arg1:string):Promise<string>;
 
 export function OpenProject(arg1:string):Promise<detect.ProjectInfo>;
+
+export function ParseFrontendServices(arg1:string):Promise<main.FrontendServicesResult>;
+
+export function PreviewFrontendCode(arg1:main.FrontendGenParams):Promise<main.FrontendPreviewResult>;
 
 export function SelectFolder():Promise<string>;
 

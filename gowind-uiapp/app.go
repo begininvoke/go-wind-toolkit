@@ -13,6 +13,7 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/frontendgen"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/generator"
 )
 
@@ -41,6 +42,20 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	a.generator.SetLogger(&wailsLogger{app: a})
+}
+
+// wailsLogger 将生成过程日志转发到 wails runtime
+type wailsLogger struct {
+	app *App
+}
+
+func (l *wailsLogger) Infof(format string, args ...any) {
+	runtime.LogInfof(l.app.ctx, format, args...)
+}
+
+func (l *wailsLogger) Errorf(format string, args ...any) {
+	runtime.LogErrorf(l.app.ctx, format, args...)
 }
 
 // OpenProject 打开指定路径的项目，并返回项目的信息。
@@ -284,29 +299,102 @@ func (a *App) GenerateRestCode(serviceName string, protoPackageStrategy string) 
 	return ""
 }
 
-func (a *App) GenerateFrontendCode(serviceName string, frontendType string) string {
-	if len(serviceName) == 0 {
-		runtime.LogErrorf(a.ctx, "服务名称不能为空")
-		return "服务名称不能为空"
+// FrontendGenParams 前端代码生成参数
+type FrontendGenParams struct {
+	// OpenapiYaml OpenAPI 规范文本（YAML/JSON）
+	OpenapiYaml string `json:"openapiYaml"`
+	// Framework 目标框架: vue-element / vue-vben / react
+	Framework string `json:"framework"`
+	// Tags 要生成的服务 tag 名；空 = 全部
+	Tags []string `json:"tags"`
+	// GenerateTypes 文件类型（composable/page/drawer/router/locale；react 的 composable 自动映射为 hooks）
+	GenerateTypes []string `json:"generateTypes"`
+	// ServiceName 生成代码的服务名（默认 admin）
+	ServiceName string `json:"serviceName"`
+	// ModulePathMap 文件名 -> 模块路径（如 role -> permission/role）
+	ModulePathMap map[string]string `json:"modulePathMap"`
+	// AutoRouterModules 未显式提供路由分组时按 basePath 自动检测
+	AutoRouterModules bool `json:"autoRouterModules"`
+}
+
+// FrontendPreviewResult 前端代码生成预览结果
+type FrontendPreviewResult struct {
+	Files []frontendgen.GeneratedFile `json:"files"`
+	Error string                      `json:"error,omitempty"`
+}
+
+// FrontendWriteResult 前端代码生成写盘结果
+type FrontendWriteResult struct {
+	Results []frontendgen.WriteResult `json:"results"`
+	Error   string                    `json:"error,omitempty"`
+}
+
+// FrontendServicesResult OpenAPI 服务解析结果
+type FrontendServicesResult struct {
+	Services []*frontendgen.ParsedService `json:"services"`
+	Error    string                       `json:"error,omitempty"`
+}
+
+// ParseFrontendServices 解析 OpenAPI 规范，返回服务列表（用于生成前的勾选）。
+func (a *App) ParseFrontendServices(openapiYaml string) *FrontendServicesResult {
+	spec, err := frontendgen.ParseOpenAPIYAML([]byte(openapiYaml))
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "解析 OpenAPI 失败: %v", err)
+		return &FrontendServicesResult{Error: err.Error()}
+	}
+	return &FrontendServicesResult{Services: frontendgen.ExtractServices(spec)}
+}
+
+// PreviewFrontendCode 预览前端代码生成结果（不写盘）。
+func (a *App) PreviewFrontendCode(params FrontendGenParams) *FrontendPreviewResult {
+	files, err := a.buildFrontendFiles(params)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "前端代码生成失败: %v", err)
+		return &FrontendPreviewResult{Error: err.Error()}
+	}
+	return &FrontendPreviewResult{Files: files}
+}
+
+// GenerateFrontendCode 生成前端代码并写入目标目录（outDir 为前端项目 src 目录）。
+// 返回的 Error 为空串表示成功。
+func (a *App) GenerateFrontendCode(outDir string, params FrontendGenParams) *FrontendWriteResult {
+	files, err := a.buildFrontendFiles(params)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "前端代码生成失败: %v", err)
+		return &FrontendWriteResult{Error: err.Error()}
 	}
 
-	if len(frontendType) == 0 {
-		runtime.LogErrorf(a.ctx, "前端类型不能为空")
-		return "前端类型不能为空"
+	results, err := frontendgen.WriteFiles(files, outDir)
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "前端代码写盘失败: %v", err)
+		return &FrontendWriteResult{Error: err.Error()}
 	}
 
-	if a.projectInfo == nil {
-		runtime.LogErrorf(a.ctx, "未打开项目，无法生成代码")
-		return "未打开项目，无法生成代码"
+	runtime.EventsEmit(a.ctx, "frontend-code-generated", results)
+
+	return &FrontendWriteResult{Results: results}
+}
+
+func (a *App) buildFrontendFiles(params FrontendGenParams) ([]frontendgen.GeneratedFile, error) {
+	framework, ok := frontendgen.ParseFramework(params.Framework)
+	if !ok {
+		return nil, fmt.Errorf("不支持的前端框架: %s（可选 vue-element / vue-vben / react）", params.Framework)
 	}
 
-	if a.dbConfig == nil {
-		runtime.LogErrorf(a.ctx, "未配置数据库连接，无法生成代码")
-		return "未配置数据库连接，无法生成代码"
+	spec, err := frontendgen.ParseOpenAPIYAML([]byte(params.OpenapiYaml))
+	if err != nil {
+		return nil, fmt.Errorf("解析 OpenAPI 失败: %w", err)
 	}
 
-	runtime.LogErrorf(a.ctx, "前端代码生成功能尚未实现")
-	return "前端代码生成功能尚未实现"
+	return frontendgen.Generate(frontendgen.Options{
+		Spec:              spec,
+		Framework:         framework,
+		Tags:              params.Tags,
+		ServiceName:       params.ServiceName,
+		ModulePathMap:     params.ModulePathMap,
+		GenerateTypes:     params.GenerateTypes,
+		AutoRouterModules: params.AutoRouterModules,
+	})
 }
 
 // ==================== AI 助手相关方法 ====================

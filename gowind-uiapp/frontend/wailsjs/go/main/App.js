@@ -130,6 +130,14 @@ export function OpenProject(arg1) {
   return window['go']['main']['App']['OpenProject'](arg1);
 }
 
+export function ParseFrontendServices(arg1) {
+  return window['go']['main']['App']['ParseFrontendServices'](arg1);
+}
+
+export function PreviewFrontendCode(arg1) {
+  return window['go']['main']['App']['PreviewFrontendCode'](arg1);
+}
+
 export function SelectFolder() {
   return window['go']['main']['App']['SelectFolder']();
 }

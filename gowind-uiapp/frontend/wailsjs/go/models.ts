@@ -509,3 +509,199 @@ export namespace generator {
 
 }
 
+
+export namespace frontendgen {
+	
+	export class GeneratedFile {
+	    path: string;
+	    content: string;
+	    description: string;
+	    serviceName: string;
+	    type: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GeneratedFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.content = source["content"];
+	        this.description = source["description"];
+	        this.serviceName = source["serviceName"];
+	        this.type = source["type"];
+	    }
+	}
+	export class ParsedField {
+	    name: string;
+	    tsType: string;
+	    description: string;
+	    isEnum: boolean;
+	    enumValues?: string[];
+	    format?: string;
+	    isArray: boolean;
+	    isBoolean: boolean;
+	    isDate: boolean;
+	    isInteger: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParsedField(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.tsType = source["tsType"];
+	        this.description = source["description"];
+	        this.isEnum = source["isEnum"];
+	        this.enumValues = source["enumValues"];
+	        this.format = source["format"];
+	        this.isArray = source["isArray"];
+	        this.isBoolean = source["isBoolean"];
+	        this.isDate = source["isDate"];
+	        this.isInteger = source["isInteger"];
+	    }
+	}
+	export class ParsedOperation {
+	    type: string;
+	    method: string;
+	    path: string;
+	    description: string;
+	    operationId: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParsedOperation(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.method = source["method"];
+	        this.path = source["path"];
+	        this.description = source["description"];
+	        this.operationId = source["operationId"];
+	    }
+	}
+	export class ParsedService {
+	    tagName: string;
+	    description: string;
+	    kebabName: string;
+	    camelName: string;
+	    pascalName: string;
+	    modelName: string;
+	    modelCamelName: string;
+	    clientGetterName: string;
+	    typePrefix: string;
+	    basePath: string;
+	    operations: ParsedOperation[];
+	    fields: ParsedField[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ParsedService(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tagName = source["tagName"];
+	        this.description = source["description"];
+	        this.kebabName = source["kebabName"];
+	        this.camelName = source["camelName"];
+	        this.pascalName = source["pascalName"];
+	        this.modelName = source["modelName"];
+	        this.modelCamelName = source["modelCamelName"];
+	        this.clientGetterName = source["clientGetterName"];
+	        this.typePrefix = source["typePrefix"];
+	        this.basePath = source["basePath"];
+	        this.operations = source["operations"];
+	        this.fields = source["fields"];
+	    }
+	}
+	export class WriteResult {
+	    path: string;
+	    action: string;
+	    bytes: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WriteResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.action = source["action"];
+	        this.bytes = source["bytes"];
+	    }
+	}
+
+}
+
+export namespace main {
+	
+	export class FrontendGenParams {
+	    openapiYaml: string;
+	    framework: string;
+	    tags?: string[];
+	    generateTypes?: string[];
+	    serviceName?: string;
+	    modulePathMap?: Record<string, string>;
+	    autoRouterModules?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new FrontendGenParams(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.openapiYaml = source["openapiYaml"];
+	        this.framework = source["framework"];
+	        this.tags = source["tags"];
+	        this.generateTypes = source["generateTypes"];
+	        this.serviceName = source["serviceName"];
+	        this.modulePathMap = source["modulePathMap"];
+	        this.autoRouterModules = source["autoRouterModules"];
+	    }
+	}
+	export class FrontendPreviewResult {
+	    files?: frontendgen.GeneratedFile[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FrontendPreviewResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.files = source["files"];
+	        this.error = source["error"];
+	    }
+	}
+	export class FrontendServicesResult {
+	    services?: frontendgen.ParsedService[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FrontendServicesResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.services = source["services"];
+	        this.error = source["error"];
+	    }
+	}
+	export class FrontendWriteResult {
+	    results?: frontendgen.WriteResult[];
+	    error?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new FrontendWriteResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.results = source["results"];
+	        this.error = source["error"];
+	    }
+	}
+
+}

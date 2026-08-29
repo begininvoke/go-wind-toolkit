@@ -155,8 +155,45 @@ jobs:
           name: gowind-toolkit-darwin-arm64
           path: gowind-uiapp/build/bin/gowind-toolkit-darwin-arm64.zip
 
+  build-cli:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            ext: ""
+          - os: windows-latest
+            target: windows-amd64
+            ext: ".exe"
+          - os: macos-latest
+            target: darwin-arm64
+            ext: ""
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: gowind-uiapp/go.mod
+          cache-dependency-path: |
+            gowind/go.sum
+            gowind-uiapp/go.sum
+
+      - name: Build gowind-cli
+        working-directory: gowind-uiapp
+        run: go build -ldflags "-s -w" -o gowind-cli-${{ matrix.target }}${{ matrix.ext }} ./cmd/gowind-cli
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gowind-cli-${{ matrix.target }}
+          path: gowind-uiapp/gowind-cli-${{ matrix.target }}${{ matrix.ext }}
+
   release:
-    needs: [build-windows, build-linux, build-macos]
+    needs: [build-windows, build-linux, build-macos, build-cli]
     runs-on: ubuntu-latest
 
     steps:

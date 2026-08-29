@@ -4,22 +4,47 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/labstack/gommon/log"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/devtools"
 	sqlkratos "github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlkratos"
 )
 
+// Logger 生成过程的日志接口（由调用方注入：GUI 注入 wails runtime 日志，CLI 注入标准输出）
+type Logger interface {
+	Infof(format string, args ...any)
+	Errorf(format string, args ...any)
+}
+
+type noopLogger struct{}
+
+func (noopLogger) Infof(string, ...any)  {}
+func (noopLogger) Errorf(string, ...any) {}
+
 type Generator struct {
 	options GeneratorOptions
+	logger  Logger
+	// skipPostProcess 跳过生成后的 tidy/buf/ent/wire 后处理链
+	skipPostProcess bool
 }
 
 func NewGenerator() *Generator {
 	return &Generator{
 		options: GeneratorOptions{},
+		logger:  noopLogger{},
 	}
+}
+
+// SetLogger 注入日志实现（默认丢弃日志）
+func (g *Generator) SetLogger(logger Logger) {
+	if logger == nil {
+		logger = noopLogger{}
+	}
+	g.logger = logger
+}
+
+// SetSkipPostProcess 跳过 gRPC 生成后的 tidy/buf/ent/wire 后处理链
+func (g *Generator) SetSkipPostProcess(skip bool) {
+	g.skipPostProcess = skip
 }
 
 // GetOptions 获取选项
@@ -108,7 +133,7 @@ func (g *Generator) GenerateGrpcCode(
 ) error {
 	opts := g.GetValidateOptions()
 	if len(opts) == 0 {
-		runtime.LogErrorf(ctx, "没有可用的表选项进行代码生成")
+		g.logger.Errorf("没有可用的表选项进行代码生成")
 		return fmt.Errorf("没有可用的表选项进行代码生成")
 	}
 
@@ -124,7 +149,7 @@ func (g *Generator) GenerateGrpcCode(
 
 		var options sqlkratos.GeneratorOptions
 
-		log.Info("开始为服务生成代码: ", serviceName)
+		g.logger.Infof("开始为服务生成代码: %s", serviceName)
 
 		options.OrmType = ormType
 		options.Driver = string(dbConfig.Type)
@@ -137,7 +162,7 @@ func (g *Generator) GenerateGrpcCode(
 			// 构建 DSN
 			dsn, err := database.BuildDSN(dbConfig)
 			if err != nil {
-				runtime.LogErrorf(ctx, "构建数据库连接字符串失败: %v", err)
+				g.logger.Errorf("构建数据库连接字符串失败: %v", err)
 				return err
 			}
 			options.Source = dsn
@@ -176,33 +201,37 @@ func (g *Generator) GenerateGrpcCode(
 		}
 
 		if err := sqlkratos.Generate(ctx, options); err != nil {
-			runtime.LogErrorf(ctx, "生成代码失败: %v", err)
+			g.logger.Errorf("生成代码失败: %v", err)
 			return err
 		}
 	}
 
-	// === 后处理步骤 ===
+	// === 后处理步骤（可通过 SkipPostProcess 跳过，如需由调用方自行控制各步骤） ===
+	if g.skipPostProcess {
+		g.logger.Infof("跳过后处理（tidy/buf/ent/wire）")
+		return nil
+	}
 
 	// 1. go mod tidy
-	log.Info("运行 go mod tidy...")
+	g.logger.Infof("运行 go mod tidy...")
 	if result := devtools.RunGoModTidy(rootPath); !result.Success {
-		runtime.LogErrorf(ctx, "go mod tidy 失败: %s\n%s", result.Error, result.Output)
+		g.logger.Errorf("go mod tidy 失败: %s\n%s", result.Error, result.Output)
 		return fmt.Errorf("go mod tidy 失败: %s\n%s", result.Error, result.Output)
 	}
 
 	// 2. buf generate（生成 protobuf 代码）
-	log.Info("运行 buf generate...")
+	g.logger.Infof("运行 buf generate...")
 	if result := devtools.RunBufGenerate(rootPath); !result.Success {
-		runtime.LogErrorf(ctx, "buf generate 失败: %s\n%s", result.Error, result.Output)
+		g.logger.Errorf("buf generate 失败: %s\n%s", result.Error, result.Output)
 		return fmt.Errorf("buf generate 失败: %s\n%s", result.Error, result.Output)
 	}
 
 	// 3. 如果是 ent ORM，执行 ent generate
 	if ormType == "ent" {
 		for _, svcName := range serviceNames {
-			log.Info("运行 ent generate: ", svcName)
+			g.logger.Infof("运行 ent generate: %s", svcName)
 			if result := devtools.RunEntGenerate(rootPath, svcName); !result.Success {
-				runtime.LogErrorf(ctx, "ent generate 失败 (%s): %s\n%s", svcName, result.Error, result.Output)
+				g.logger.Errorf("ent generate 失败 (%s): %s\n%s", svcName, result.Error, result.Output)
 				return fmt.Errorf("ent generate 失败 (%s): %s\n%s", svcName, result.Error, result.Output)
 			}
 		}
@@ -210,9 +239,9 @@ func (g *Generator) GenerateGrpcCode(
 
 	// 4. wire generate（依赖注入代码生成）
 	for _, svcName := range serviceNames {
-		log.Info("运行 wire generate: ", svcName)
+		g.logger.Infof("运行 wire generate: %s", svcName)
 		if result := devtools.RunWire(rootPath, svcName); !result.Success {
-			runtime.LogErrorf(ctx, "wire 生成失败 (%s): %s\n%s", svcName, result.Error, result.Output)
+			g.logger.Errorf("wire 生成失败 (%s): %s\n%s", svcName, result.Error, result.Output)
 			return fmt.Errorf("wire 生成失败 (%s): %s\n%s", svcName, result.Error, result.Output)
 		}
 	}
@@ -231,7 +260,7 @@ func (g *Generator) GenerateRestCode(
 ) error {
 	opts := g.GetValidateOptions()
 	if len(opts) == 0 {
-		runtime.LogErrorf(ctx, "没有可用的表选项进行代码生成")
+		g.logger.Errorf("没有可用的表选项进行代码生成")
 		return fmt.Errorf("没有可用的表选项进行代码生成")
 	}
 
@@ -243,7 +272,7 @@ func (g *Generator) GenerateRestCode(
 	for serviceName, serviceOpts := range mapOpts {
 		var options sqlkratos.GeneratorOptions
 
-		log.Info("开始为服务生成代码: ", serviceName)
+		g.logger.Infof("开始为服务生成代码: %s", serviceName)
 
 		options.Driver = string(dbConfig.Type)
 		options.OrmType = ormType
@@ -256,7 +285,7 @@ func (g *Generator) GenerateRestCode(
 			// 构建 DSN
 			dsn, err := database.BuildDSN(dbConfig)
 			if err != nil {
-				runtime.LogErrorf(ctx, "构建数据库连接字符串失败: %v", err)
+				g.logger.Errorf("构建数据库连接字符串失败: %v", err)
 				return err
 			}
 			options.Source = dsn
@@ -295,7 +324,7 @@ func (g *Generator) GenerateRestCode(
 		}
 
 		if err := sqlkratos.Generate(ctx, options); err != nil {
-			runtime.LogErrorf(ctx, "生成代码失败: %v", err)
+			g.logger.Errorf("生成代码失败: %v", err)
 			return err
 		}
 	}

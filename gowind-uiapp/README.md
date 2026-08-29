@@ -43,6 +43,8 @@ gowind-uiapp/
 │   │   └── assets/       # 静态资源
 │   ├── package.json      # 前端依赖与脚本
 │   └── ...
+├── cmd/gowind-cli/       # 命令行入口（非交互、JSON 输出，供 AI/脚本调用，见 docs/cli.md）
+├── docs/                 # 文档（cli.md 等）
 ├── build/                # 构建相关资源与平台适配
 └── README.md             # 项目说明文档
 ```

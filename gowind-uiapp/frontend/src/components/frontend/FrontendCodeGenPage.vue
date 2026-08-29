@@ -17,27 +17,11 @@ import {
 } from '@ant-design/icons-vue'
 
 import {GenerateFrontendCode} from "../../../wailsjs/go/main/App";
+import {ParseFrontendServices} from "../../../wailsjs/go/main/App";
+import {PreviewFrontendCode} from "../../../wailsjs/go/main/App";
 import {SelectFolder} from "../../../wailsjs/go/main/App";
+import {frontendgen, type main} from "../../../wailsjs/go/models";
 
-import {parseOpenApiYaml, extractServices, type ParsedService, type OpenApiSpec} from "../../utils/openapi-parser";
-import {
-  generateAll as generateVueAll,
-  type GeneratedFile as VueGeneratedFile,
-  type GenerateFileType as VueGenerateFileType,
-  type RouterModuleConfig as VueRouterModuleConfig,
-} from "../../generators/vue-element";
-import {
-  generateAll as generateReactAll,
-  type ReactGeneratedFile,
-  type ReactGenerateFileType,
-  type ReactRouterModuleConfig,
-} from "../../generators/react-antd";
-import {
-  generateAll as generateVbenAll,
-  type VbenGeneratedFile,
-  type VbenGenerateFileType,
-  type VbenRouterModuleConfig,
-} from "../../generators/vue-vben";
 import MonacoEditor from "../backend/MonacoEditor.vue";
 
 const {t} = useI18n()
@@ -73,19 +57,17 @@ const remoteLoading = ref(false)
 const yamlContent = ref('')
 
 // ==================== OpenAPI 数据 ====================
-const parsedSpec = ref<OpenApiSpec | null>(null)
-const parsedServices = ref<ParsedService[]>([])
+const parsedServices = ref<frontendgen.ParsedService[]>([])
 const selectedServiceKeys = ref<string[]>([])
 
 // ==================== 生成选项 ====================
 const generateOptions = ref({
   outputDir: '',
-  generateTypes: ['service', 'composable', 'page', 'drawer', 'router', 'locale'] as string[],
+  generateTypes: ['composable', 'page', 'drawer', 'router', 'locale'] as string[],
 })
-const routerModules = ref<(VueRouterModuleConfig | ReactRouterModuleConfig | VbenRouterModuleConfig)[]>([])
 
 // ==================== 生成结果 ====================
-const generatedFiles = ref<(VueGeneratedFile | ReactGeneratedFile | VbenGeneratedFile)[]>([])
+const generatedFiles = ref<frontendgen.GeneratedFile[]>([])
 const selectedFileIndex = ref(0)
 
 const currentFileContent = ref('')
@@ -97,7 +79,6 @@ const fileTypeOptions = computed(() => {
   const isReact = targetFramework.value === 'react'
   return [
     {label: t('frontend.fileType.all'), value: 'all'},
-    {label: 'Service', value: 'service'},
     {label: isReact ? 'Hooks' : 'Composable', value: isReact ? 'hooks' : 'composable'},
     {label: t('frontend.fileType.page'), value: 'page'},
     {label: t('frontend.fileType.drawer'), value: 'drawer'},
@@ -106,7 +87,7 @@ const fileTypeOptions = computed(() => {
   ]
 })
 
-const filteredFiles = ref<(VueGeneratedFile | ReactGeneratedFile | VbenGeneratedFile)[]>([])
+const filteredFiles = ref<frontendgen.GeneratedFile[]>([])
 
 function filterFiles() {
   if (activeFileType.value === 'all') {
@@ -241,17 +222,20 @@ function fetchViaXhr(url: string): Promise<Response> {
 }
 
 // ==================== 解析 ====================
-function handleParse() {
+async function handleParse() {
+  if (!yamlContent.value.trim()) return
   try {
-    if (!yamlContent.value.trim()) return
-    parsedSpec.value = parseOpenApiYaml(yamlContent.value)
-    parsedServices.value = extractServices(parsedSpec.value)
+    const res = await ParseFrontendServices(yamlContent.value)
+    if (res.error) {
+      message.error(t('frontend.import.parseFailed', {msg: res.error}))
+      return
+    }
+    parsedServices.value = res.services ?? []
 
     selectedServiceKeys.value = parsedServices.value
-      .filter((s: ParsedService) => s.operations.some((op: { type: string }) => op.type === 'list'))
+      .filter((s: frontendgen.ParsedService) => s.operations.some((op: { type: string }) => op.type === 'list'))
       .map(s => s.tagName)
 
-    autoDetectRouterModules(parsedServices.value)
     currentStep.value = 1
   } catch (e: any) {
     message.error(t('frontend.import.parseFailed', {msg: e.message || e}))
@@ -259,48 +243,36 @@ function handleParse() {
   }
 }
 
+// ==================== 生成参数 ====================
+function buildGenParams(): main.FrontendGenParams {
+  return {
+    openapiYaml: yamlContent.value,
+    framework: targetFramework.value,
+    tags: [...selectedServiceKeys.value],
+    generateTypes: [...generateOptions.value.generateTypes],
+    serviceName: '',
+    modulePathMap: {},
+    autoRouterModules: true,
+  }
+}
+
 // ==================== 预览 ====================
-function handlePreview() {
+async function handlePreview() {
   const selectedServices = parsedServices.value.filter(
     s => selectedServiceKeys.value.includes(s.tagName)
   )
   if (selectedServices.length === 0) return
 
-  if (targetFramework.value === 'vue-element') {
-    generatedFiles.value = generateVueAll({
-      services: selectedServices,
-      serviceName: '',
-      generateTypes: generateOptions.value.generateTypes as VueGenerateFileType[],
-      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value as VueRouterModuleConfig[] : undefined,
-    })
-  } else if (targetFramework.value === 'react') {
-    // React 使用 hooks 而不是 composable
-    const reactTypes = generateOptions.value.generateTypes.map(t =>
-      t === 'composable' ? 'hooks' : t
-    ) as ReactGenerateFileType[]
-
-    generatedFiles.value = generateReactAll({
-      services: selectedServices,
-      serviceName: '',
-      generateTypes: reactTypes,
-      routerModules: reactTypes.includes('router') ? routerModules.value as ReactRouterModuleConfig[] : undefined,
-    })
-  } else if (targetFramework.value === 'vue-vben') {
-    generatedFiles.value = generateVbenAll({
-      services: selectedServices,
-      serviceName: '',
-      generateTypes: generateOptions.value.generateTypes as VbenGenerateFileType[],
-      routerModules: generateOptions.value.generateTypes.includes('router') ? routerModules.value as VbenRouterModuleConfig[] : undefined,
-    })
-  } else {
-    // 其他框架暂未实现，生成占位提示
-    generatedFiles.value = selectedServices.map(s => ({
-      path: `${targetFramework.value}/${s.tagName}/placeholder.txt`,
-      content: `[${frameworkOptions.find(f => f.value === targetFramework.value)?.label}] ${t('frontend.placeholder.notImplemented')}\n\n${t('frontend.placeholder.service')}: ${s.modelName}\n${t('frontend.placeholder.description')}: ${s.description}\n${t('frontend.placeholder.fields')}: ${s.fields.length}\n${t('frontend.placeholder.operations')}: ${s.operations.map(o => o.type).join(', ')}\n\n${t('frontend.placeholder.comingSoon')}`,
-      type: 'service' as const,
-      description: `${s.modelName} - ${t('frontend.placeholder.notImplemented')}`,
-      serviceName: s.tagName,
-    }))
+  try {
+    const res = await PreviewFrontendCode(buildGenParams())
+    if (res.error) {
+      message.error(res.error)
+      return
+    }
+    generatedFiles.value = res.files ?? []
+  } catch (e: any) {
+    message.error(e.message || e)
+    return
   }
 
   selectedFileIndex.value = 0
@@ -329,7 +301,7 @@ function handleSelectAll() {
 
 function handleSelectCrud() {
   selectedServiceKeys.value = parsedServices.value
-    .filter((s: ParsedService) => s.operations.some((op: { type: string }) => op.type === 'list'))
+    .filter((s: frontendgen.ParsedService) => s.operations.some((op: { type: string }) => op.type === 'list'))
     .map(s => s.tagName)
 }
 
@@ -342,21 +314,27 @@ function toggleServiceSelection(tagName: string) {
   }
 }
 
-// ==================== 确认生成 ====================
+// ==================== 确认生成（写盘） ====================
 async function handleCommit() {
+  if (!generateOptions.value.outputDir) {
+    message.warning(t('frontend.config.outputDirRequired'))
+    return
+  }
+
   try {
     confirmLoading.value = true
-    const frameworkMap: Record<TargetFramework, string> = {
-      'vue-element': 'vue-element',
-      'vue-vben': 'vue-vben',
-      'react': 'react',
+    const res = await GenerateFrontendCode(generateOptions.value.outputDir, buildGenParams())
+    if (res.error) {
+      message.error(res.error)
+      return
     }
-    const res = await GenerateFrontendCode(generateOptions.value.outputDir, frameworkMap[targetFramework.value])
-    if (res === '') {
-      currentStep.value = 0
-      resetState()
-    }
-  } catch (error) {
+
+    const count = res.results?.length ?? 0
+    message.success(t('frontend.config.generateSuccess', {count}))
+    currentStep.value = 0
+    resetState()
+  } catch (error: any) {
+    message.error(error.message || error)
     console.error('代码生成失败:', error)
   } finally {
     confirmLoading.value = false
@@ -365,65 +343,17 @@ async function handleCommit() {
 
 function resetState() {
   yamlContent.value = ''
-  parsedSpec.value = null
   parsedServices.value = []
   selectedServiceKeys.value = []
   generatedFiles.value = []
   filteredFiles.value = []
   selectedFileIndex.value = 0
-  routerModules.value = []
   currentFileContent.value = ''
   selectedFileName.value = ''
   remoteUrl.value = ''
   generateOptions.value.outputDir = ''
 }
 
-// ==================== 路由模块自动检测 ====================
-function autoDetectRouterModules(services: ParsedService[]) {
-  const groupMap = new Map<string, ParsedService[]>()
-  for (const service of services) {
-    const parts = service.basePath.split('/').filter(Boolean)
-    const groupKey = parts.length >= 3 ? parts[2].split('-')[0] : 'other'
-    if (!groupMap.has(groupKey)) groupMap.set(groupKey, [])
-    groupMap.get(groupKey)!.push(service)
-  }
-
-  const moduleIconMap: Record<string, string> = {
-    'api': 'lucide:route', 'dict': 'lucide:library-big', 'file': 'lucide:file-search',
-    'login': 'lucide:shield-x', 'permission': 'lucide:shield-check', 'opm': 'lucide:users',
-    'user': 'lucide:user', 'role': 'lucide:shield-user', 'menu': 'lucide:square-menu',
-    'tenant': 'lucide:building-2', 'internal': 'lucide:message-square',
-    'audit': 'lucide:scroll-text', 'language': 'lucide:globe', 'task': 'lucide:list-todo',
-  }
-
-  routerModules.value = []
-  let order = 2001
-  for (const [groupKey, groupServices] of groupMap) {
-    const moduleKey = ['audit', 'login', 'operation', 'data'].includes(groupKey) ? 'log'
-      : ['dict', 'file', 'language', 'task', 'loginP'].includes(groupKey) ? 'system'
-      : ['permission', 'role', 'menu'].includes(groupKey) ? 'permission'
-      : ['user', 'org', 'position'].includes(groupKey) ? 'opm'
-      : groupKey === 'tenant' ? 'tenant'
-      : groupKey === 'internal' ? 'internalMessage'
-      : groupKey
-
-    const existing = routerModules.value.find(m => m.moduleKey === moduleKey)
-    if (existing) {
-      existing.serviceTags.push(...groupServices.map(s => s.tagName))
-    } else {
-      const desc = groupServices[0].description
-      const displayName = desc.replace(/管理.*/, '').replace(/服务.*/, '').replace(/查询.*/, '').replace(/日志.*/, '日志审计').trim()
-      routerModules.value.push({
-        moduleKey,
-        moduleDisplayName: displayName || moduleKey,
-        moduleIcon: moduleIconMap[groupKey] || 'lucide:folder',
-        moduleOrder: order++,
-        authority: [],
-        serviceTags: groupServices.map(s => s.tagName),
-      })
-    }
-  }
-}
 
 function getOperationTag(type: string) {
   const map: Record<string, { color: string; text: string }> = {
@@ -587,7 +517,6 @@ const previewLanguage = computed(() => {
           </a-form-item>
           <a-form-item v-if="targetFramework === 'vue-element' || targetFramework === 'react' || targetFramework === 'vue-vben'" :label="t('frontend.config.generateTypes')">
             <a-checkbox-group v-model:value="generateOptions.generateTypes">
-              <a-checkbox value="service">{{ t('frontend.config.serviceLayer') }}</a-checkbox>
               <a-checkbox v-if="targetFramework === 'vue-element' || targetFramework === 'vue-vben'" value="composable">{{ t('frontend.config.composableLayer') }}</a-checkbox>
               <a-checkbox v-if="targetFramework === 'react'" value="composable">React Query Hooks</a-checkbox>
               <a-checkbox value="page">{{ t('frontend.config.listPage') }}</a-checkbox>

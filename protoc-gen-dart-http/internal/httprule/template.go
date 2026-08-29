@@ -140,7 +140,7 @@ func (p *parser) parseMatchSingleSegment() Segment {
 }
 
 func (p *parser) parseLiteralSegment() (Segment, error) {
-	lit, err := p.parseLiteral()
+	lit, err := p.parseLiteral(false)
 	if err != nil {
 		return Segment{}, err
 	}
@@ -185,7 +185,9 @@ func (p *parser) parseVerb() (string, error) {
 	if err := p.expect(':'); err != nil {
 		return "", err
 	}
-	return p.parseLiteral()
+	// The verb literal may itself contain ':' (e.g. "/v1/me:list:version"),
+	// which the grpc-gateway Go compiler accepts.
+	return p.parseLiteral(true)
 }
 
 func (p *parser) parseFieldPath() ([]string, error) {
@@ -205,6 +207,8 @@ func (p *parser) parseFieldPath() ([]string, error) {
 }
 
 // parseLiteral consumes input as long as next token(s) belongs to pchars, as defined in RFC3986.
+// When allowColon is true, ':' is also accepted, which the verb grammar needs
+// for paths like "/v1/me:list:version".
 // Returns an error if not literal is found.
 //
 // https://www.ietf.org/rfc/rfc3986.txt, P.49
@@ -214,11 +218,11 @@ func (p *parser) parseFieldPath() ([]string, error) {
 //	sub-delims    = "!" / "$" / "&" / "'" / "(" / ")"
 //	              / "*" / "+" / "," / ";" / "="
 //	pct-encoded   = "%" HEXDIG HEXDIG
-func (p *parser) parseLiteral() (string, error) {
+func (p *parser) parseLiteral(allowColon bool) (string, error) {
 	var literal []rune
 	startPos := p.pos
 	for {
-		if isSingleCharPChar(p.tok) {
+		if isSingleCharPChar(p.tok) || (allowColon && p.tok == ':') {
 			literal = append(literal, p.tok)
 			p.next()
 			continue

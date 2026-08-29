@@ -32,6 +32,17 @@ func Test_ParseTemplate(t *testing.T) {
 			},
 		},
 		{
+			input: "/im/v1/me:list:version",
+			path: Template{
+				Segments: []Segment{
+					{Kind: SegmentKindLiteral, Literal: "im"},
+					{Kind: SegmentKindLiteral, Literal: "v1"},
+					{Kind: SegmentKindLiteral, Literal: "me"},
+				},
+				Verb: "list:version",
+			},
+		},
+		{
 			input: "/{id}",
 			path: Template{
 				Segments: []Segment{

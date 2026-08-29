@@ -16,8 +16,7 @@ type serviceGenerator struct {
 }
 
 func (s serviceGenerator) Generate(f *codegen.File) error {
-	s.generateClient(f)
-	return nil
+	return s.generateClient(f)
 }
 
 func (s serviceGenerator) generateClient(f *codegen.File) error {

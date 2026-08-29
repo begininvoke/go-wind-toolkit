@@ -1,0 +1,13 @@
+  "dictType": {
+    "moduleName": "Dict Type",
+    "code": "Type Code",
+    "is_enabled": "Is Enabled",
+    "name": "Type Name",
+    "remark": "Remark",
+    "sort_order": "Sort Order",
+    "status": "Status",
+    "button": {
+      "create": "Create Dict Type",
+      "update": "Update Dict Type"
+    }
+  }

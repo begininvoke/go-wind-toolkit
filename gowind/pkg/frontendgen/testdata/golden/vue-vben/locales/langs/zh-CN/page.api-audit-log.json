@@ -1,0 +1,14 @@
+  "apiAuditLog": {
+    "moduleName": "API审计日志",
+    "duration": "耗时",
+    "ip_address": "IP地址",
+    "is_success": "是否成功",
+    "operated_at": "操作时间",
+    "operator_name": "操作者",
+    "request_method": "请求方法",
+    "request_path": "请求路径",
+    "button": {
+      "create": "创建API审计日志",
+      "update": "更新API审计日志"
+    }
+  }

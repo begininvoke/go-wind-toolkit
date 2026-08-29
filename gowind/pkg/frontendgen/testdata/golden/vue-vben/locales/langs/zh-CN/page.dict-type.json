@@ -1,0 +1,13 @@
+  "dictType": {
+    "moduleName": "字典类型管理",
+    "code": "类型编码",
+    "is_enabled": "是否启用",
+    "name": "类型名称",
+    "remark": "备注",
+    "sort_order": "排序",
+    "status": "状态",
+    "button": {
+      "create": "创建字典类型管理",
+      "update": "更新字典类型管理"
+    }
+  }

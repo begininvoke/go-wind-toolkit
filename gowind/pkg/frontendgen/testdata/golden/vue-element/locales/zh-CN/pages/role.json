@@ -1,0 +1,15 @@
+{
+  "moduleName": "角色管理",
+  "code": "角色编码",
+  "description": "描述",
+  "is_protected": "受保护角色",
+  "name": "角色名称",
+  "permissions": "权限配置",
+  "sort_order": "排序",
+  "status": "状态",
+  "tenant_name": "所属租户",
+  "button": {
+    "create": "创建角色管理",
+    "update": "更新角色管理"
+  }
+}

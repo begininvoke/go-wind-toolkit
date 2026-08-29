@@ -1,0 +1,15 @@
+  "role": {
+    "moduleName": "Role",
+    "code": "Role Code",
+    "description": "Description",
+    "is_protected": "Is Protected",
+    "name": "Role Name",
+    "permissions": "Permissions",
+    "sort_order": "Sort Order",
+    "status": "Status",
+    "tenant_name": "Tenant",
+    "button": {
+      "create": "Create Role",
+      "update": "Update Role"
+    }
+  }

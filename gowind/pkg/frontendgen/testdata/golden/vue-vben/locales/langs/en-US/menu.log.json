@@ -1,0 +1,4 @@
+  "log": {
+    "moduleName": "日志审计",
+    "apiAuditLog": "ApiAuditLog",
+  }

@@ -1,0 +1,297 @@
+# 合成测试规格：覆盖前端生成器的关键路径
+# - RoleService          permissionservicev1 前缀，完整 CRUD，含枚举/布尔/整型数组字段
+# - DictTypeService      dictservicev1 前缀，完整 CRUD，连字符文件名 dict-type
+# - OrgUnitService       identityservicev1 前缀，完整 CRUD
+# - ApiAuditLogService   auditservicev1 前缀，仅 List/Get
+# 注意：paths、tags、properties 均按字典序书写（Go 移植按文档序遍历，两者一致）
+openapi: 3.0.3
+info:
+    title: FrontendGen Test API
+    description: FrontendGen Test API
+    version: "1.0"
+tags:
+    - name: ApiAuditLogService
+      description: API审计日志查询服务
+    - name: DictTypeService
+      description: 字典类型管理服务
+    - name: OrgUnitService
+      description: 组织架构管理服务
+    - name: RoleService
+      description: 角色管理服务
+paths:
+    /admin/v1/api-audit-logs:
+        get:
+            tags:
+                - ApiAuditLogService
+            description: 查询API审计日志列表
+            operationId: ApiAuditLogService_List
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListApiAuditLogResponse'
+    /admin/v1/api-audit-logs/{id}:
+        get:
+            tags:
+                - ApiAuditLogService
+            description: 查询API审计日志详情
+            operationId: ApiAuditLogService_Get
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ApiAuditLog'
+    /admin/v1/dict-types:
+        get:
+            tags:
+                - DictTypeService
+            description: 查询字典类型列表
+            operationId: DictTypeService_List
+            responses:
+                "200":
+                    description: OK
+        post:
+            tags:
+                - DictTypeService
+            description: 创建字典类型
+            operationId: DictTypeService_Create
+            responses:
+                "200":
+                    description: OK
+    /admin/v1/dict-types/{id}:
+        get:
+            tags:
+                - DictTypeService
+            description: 查询字典类型详情
+            operationId: DictTypeService_Get
+            responses:
+                "200":
+                    description: OK
+        put:
+            tags:
+                - DictTypeService
+            description: 更新字典类型
+            operationId: DictTypeService_Update
+            responses:
+                "200":
+                    description: OK
+        delete:
+            tags:
+                - DictTypeService
+            description: 删除字典类型
+            operationId: DictTypeService_Delete
+            responses:
+                "200":
+                    description: OK
+    /admin/v1/org-units:
+        get:
+            tags:
+                - OrgUnitService
+            description: 查询组织架构列表
+            operationId: OrgUnitService_List
+            responses:
+                "200":
+                    description: OK
+        post:
+            tags:
+                - OrgUnitService
+            description: 创建组织架构
+            operationId: OrgUnitService_Create
+            responses:
+                "200":
+                    description: OK
+    /admin/v1/org-units/{id}:
+        get:
+            tags:
+                - OrgUnitService
+            description: 查询组织架构详情
+            operationId: OrgUnitService_Get
+            responses:
+                "200":
+                    description: OK
+        put:
+            tags:
+                - OrgUnitService
+            description: 更新组织架构
+            operationId: OrgUnitService_Update
+            responses:
+                "200":
+                    description: OK
+        delete:
+            tags:
+                - OrgUnitService
+            description: 删除组织架构
+            operationId: OrgUnitService_Delete
+            responses:
+                "200":
+                    description: OK
+    /admin/v1/roles:
+        get:
+            tags:
+                - RoleService
+            description: 查询角色列表
+            operationId: RoleService_List
+            responses:
+                "200":
+                    description: OK
+        post:
+            tags:
+                - RoleService
+            description: 创建角色
+            operationId: RoleService_Create
+            responses:
+                "200":
+                    description: OK
+    /admin/v1/roles/{id}:
+        get:
+            tags:
+                - RoleService
+            description: 查询角色详情
+            operationId: RoleService_Get
+            responses:
+                "200":
+                    description: OK
+        put:
+            tags:
+                - RoleService
+            description: 更新角色
+            operationId: RoleService_Update
+            responses:
+                "200":
+                    description: OK
+        delete:
+            tags:
+                - RoleService
+            description: 删除角色
+            operationId: RoleService_Delete
+            responses:
+                "200":
+                    description: OK
+components:
+    schemas:
+        ApiAuditLog:
+            type: object
+            description: API审计日志
+            properties:
+                duration:
+                    type: integer
+                    format: int64
+                    description: 耗时
+                ipAddress:
+                    type: string
+                    description: IP地址
+                isSuccess:
+                    type: boolean
+                    description: 是否成功
+                operatedAt:
+                    type: string
+                    format: date-time
+                    description: 操作时间
+                operatorName:
+                    type: string
+                    description: 操作者
+                requestMethod:
+                    type: string
+                    format: enum
+                    enum:
+                        - GET
+                        - POST
+                        - PUT
+                        - DELETE
+                    description: 请求方法
+                requestPath:
+                    type: string
+                    description: 请求路径
+        DictType:
+            type: object
+            description: 字典类型
+            properties:
+                code:
+                    type: string
+                    description: 类型编码
+                isEnabled:
+                    type: boolean
+                    description: 是否启用
+                name:
+                    type: string
+                    description: 类型名称
+                remark:
+                    type: string
+                    description: 备注
+                sortOrder:
+                    type: integer
+                    format: int32
+                    description: 排序
+                status:
+                    type: string
+                    format: enum
+                    enum:
+                        - ON
+                        - OFF
+                    description: 状态
+        ListApiAuditLogResponse:
+            type: object
+            description: API审计日志列表回应
+            properties:
+                items:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ApiAuditLog'
+        OrgUnit:
+            type: object
+            description: 组织架构
+            properties:
+                leader:
+                    type: string
+                    description: 负责人
+                name:
+                    type: string
+                    description: 组织名称
+                parentId:
+                    type: integer
+                    format: uint64
+                    description: 父级组织
+                sortOrder:
+                    type: integer
+                    format: int32
+                    description: 排序
+        Role:
+            type: object
+            description: 角色
+            properties:
+                code:
+                    type: string
+                    description: 角色编码
+                description:
+                    type: string
+                    description: 描述
+                isProtected:
+                    type: boolean
+                    description: 受保护角色
+                name:
+                    type: string
+                    description: 角色名称
+                permissions:
+                    type: array
+                    items:
+                        type: integer
+                        format: uint32
+                    description: 权限配置
+                sortOrder:
+                    type: integer
+                    format: int32
+                    description: 排序
+                status:
+                    type: string
+                    format: enum
+                    enum:
+                        - ON
+                        - OFF
+                    description: 状态
+                tenantName:
+                    type: string
+                    description: 所属租户

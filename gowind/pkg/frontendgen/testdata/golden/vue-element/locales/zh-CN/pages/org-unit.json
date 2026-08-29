@@ -1,0 +1,11 @@
+{
+  "moduleName": "组织架构管理",
+  "leader": "负责人",
+  "name": "组织名称",
+  "parent_id": "父级组织",
+  "sort_order": "排序",
+  "button": {
+    "create": "创建组织架构管理",
+    "update": "更新组织架构管理"
+  }
+}

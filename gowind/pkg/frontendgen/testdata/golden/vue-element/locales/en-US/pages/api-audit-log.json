@@ -1,0 +1,14 @@
+{
+  "moduleName": "ApiAuditLog",
+  "duration": "Duration",
+  "ip_address": "IP Address",
+  "is_success": "Is Success",
+  "operated_at": "OperatedAt Time",
+  "operator_name": "Operator",
+  "request_method": "Request Method",
+  "request_path": "Request Path",
+  "button": {
+    "create": "Create ApiAuditLog",
+    "update": "Update ApiAuditLog"
+  }
+}

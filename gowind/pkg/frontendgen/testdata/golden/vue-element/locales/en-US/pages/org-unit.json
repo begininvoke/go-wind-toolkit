@@ -1,0 +1,11 @@
+{
+  "moduleName": "OrgUnit",
+  "leader": "Leader",
+  "name": "Organization Name",
+  "parent_id": "Parent Organization",
+  "sort_order": "Sort Order",
+  "button": {
+    "create": "Create OrgUnit",
+    "update": "Update OrgUnit"
+  }
+}

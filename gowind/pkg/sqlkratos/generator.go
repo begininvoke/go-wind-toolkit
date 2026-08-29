@@ -21,8 +21,12 @@ import (
 // If the DSN already contains "://", it is returned as-is.
 // For PostgreSQL key-value format DSN (e.g. "host=localhost port=5432 user=postgres ..."),
 // it converts to URL format (e.g. "postgres://user:pass@host:port/dbname?sslmode=disable").
+// DDL 文本（CREATE TABLE 语句）不做处理，交给下游 sqlproto 的 text:// 识别。
 func ensureDSNScheme(dsn, driver string) string {
 	if strings.Contains(dsn, "://") {
+		return dsn
+	}
+	if isDDLText(dsn) {
 		return dsn
 	}
 	switch strings.ToLower(driver) {
@@ -43,6 +47,12 @@ func ensureDSNScheme(dsn, driver string) string {
 // Key-value DSN contains space-separated key=value pairs like "host=localhost port=5432 user=postgres".
 func isPostgresKeyValueDSN(dsn string) bool {
 	return strings.Contains(dsn, "=") && strings.Contains(dsn, " ")
+}
+
+// isDDLText detects DDL text content (CREATE TABLE statements) passed as Source
+// instead of a DSN; such content must be handed to sqlproto's text:// handling as-is.
+func isDDLText(dsn string) bool {
+	return strings.Contains(strings.ToUpper(dsn), "CREATE TABLE")
 }
 
 // convertPostgresKeyValueToURL converts PostgreSQL key-value DSN to URL format.

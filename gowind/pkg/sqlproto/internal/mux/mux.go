@@ -24,6 +24,15 @@ type (
 	}
 )
 
+// Close 关闭底层连接。text/file 等 DDL 文本驱动没有底层连接
+// （内嵌 Closer 为 nil），直接返回成功避免 panic。
+func (d *ConvertDriver) Close() error {
+	if d.Closer != nil {
+		return d.Closer.Close()
+	}
+	return nil
+}
+
 // New returns a new Mux.
 func New() *Mux {
 	return &Mux{

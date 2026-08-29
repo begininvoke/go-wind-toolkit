@@ -151,7 +151,21 @@ func (t *Text) InspectSchema(ctx context.Context, sqlContent string, opts *schem
 		return nil, fmt.Errorf("解析失败: %v", err)
 	}
 
+	// 按 InspectOptions.Tables 过滤（nil/空 = 全部表），
+	// 与数据库直连路径的 atlas Inspector 行为一致
+	var includeTables map[string]bool
+	if opts != nil && len(opts.Tables) > 0 {
+		includeTables = make(map[string]bool, len(opts.Tables))
+		for _, name := range opts.Tables {
+			includeTables[name] = true
+		}
+	}
+
 	for _, tbl := range tables {
+		if includeTables != nil && !includeTables[tbl.Name] {
+			continue
+		}
+
 		table := &schema.Table{
 			Name:   tbl.Name,
 			Schema: s,

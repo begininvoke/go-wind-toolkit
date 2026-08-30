@@ -147,8 +147,63 @@ func (m messageGenerator) Generate(f *codegen.File) {
 		f.P(t(2), ");")
 		f.P(t(1), "}")
 	}
+	f.P()
+
+	// --- 二进制 proto 编解码（writeToBuffer/fromBuffer，依赖根目录 proto_wire.dart）---
+	generateWireMembers(messageGenerator{pkg: m.pkg, message: m.message}, f, className)
 
 	f.P("}")
+	f.P()
+}
+
+// generateWireMembers 发射消息类的二进制 proto 编解码成员。
+func generateWireMembers(m messageGenerator, f *codegen.File, className string) {
+	wireFields := wireFields(m.message)
+
+	f.P(t(1), "/// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）")
+	f.P(t(1), "Uint8List writeToBuffer() {")
+	f.P(t(2), "final w = ProtoWireWriter();")
+	f.P(t(2), "_writeTo(w);")
+	f.P(t(2), "return w.toBuffer();")
+	f.P(t(1), "}")
+	f.P()
+
+	f.P(t(1), "void _writeTo(ProtoWireWriter w) {")
+	for _, field := range wireFields {
+		f.P(t(2), "// field ", int(field.Number()), ": ", field.JSONName())
+		for _, line := range wireWriteStmts(m.pkg, field) {
+			f.P(t(2), line)
+		}
+	}
+	f.P(t(1), "}")
+	f.P()
+
+	f.P(t(1), "factory ", className, ".fromBuffer(List<int> bytes) {")
+	f.P(t(2), "return ", className, "._readFrom(ProtoWireReader(bytes));")
+	f.P(t(1), "}")
+	f.P()
+
+	f.P(t(1), "static ", className, " _readFrom(ProtoWireReader r) {")
+	f.P(t(2), "final m = ", className, "();")
+	f.P(t(2), "while (r.next()) {")
+	f.P(t(3), "switch (r.fieldNumber) {")
+	if len(wireFields) > 0 {
+		for _, field := range wireFields {
+			f.P(t(4), "// field ", int(field.Number()), ": ", field.JSONName())
+			for _, line := range wireReadCaseStmts(m.pkg, field) {
+				f.P(t(4), line)
+			}
+		}
+		f.P(t(4), "default: {")
+		f.P(t(5), "r.skip();")
+		f.P(t(4), "}")
+	} else {
+		f.P(t(4), "default: r.skip();")
+	}
+	f.P(t(3), "}")
+	f.P(t(2), "}")
+	f.P(t(2), "return m;")
+	f.P(t(1), "}")
 	f.P()
 }
 

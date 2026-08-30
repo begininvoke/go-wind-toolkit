@@ -20,7 +20,10 @@ func (p packageGenerator) Generate(f *codegen.File) error {
 		f.P("import 'dart:async';")
 		f.P("import 'dart:convert';")
 	}
+	// 二进制 proto 编解码成员（writeToBuffer/fromBuffer）所需
+	f.P("import 'dart:typed_data';")
 	f.P("import '", transportImportPath(p.pkg), "';")
+	f.P("import '", protoWireImportPath(p.pkg), "';")
 	f.P()
 
 	// defaultHost constant (only if there are services and a host is set).

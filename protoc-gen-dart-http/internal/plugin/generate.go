@@ -52,6 +52,14 @@ func Generate(request *pluginpb.CodeGeneratorRequest) (*pluginpb.CodeGeneratorRe
 		Content: proto.String(string(transportFile.Content())),
 	})
 
+	// Emit shared proto_wire.dart at the output root once.
+	var protoWireFile codegen.File
+	generateProtoWireSharedFile(&protoWireFile)
+	res.File = append(res.File, &pluginpb.CodeGeneratorResponse_File{
+		Name:    proto.String("proto_wire.dart"),
+		Content: proto.String(string(protoWireFile.Content())),
+	})
+
 	for pkg, files := range packaged {
 		if len(files) == 0 {
 			continue

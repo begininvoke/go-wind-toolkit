@@ -36,20 +36,25 @@ func (e enumGenerator) Generate(f *codegen.File) {
 	for i, value := range values {
 		dartName := dartFieldName(protoEnumToDartName(string(value.Name())))
 		protoName := string(value.Name())
+		wireNumber := int(value.Number())
 		if i == len(values)-1 {
-			f.P(t(1), dartName, "(", dartString(protoName), ");")
+			f.P(t(1), dartName, "(", dartString(protoName), ", ", wireNumber, ");")
 		} else {
-			f.P(t(1), dartName, "(", dartString(protoName), "),")
+			f.P(t(1), dartName, "(", dartString(protoName), ", ", wireNumber, "),")
 		}
 	}
 	f.P()
 	f.P(t(1), "final String value;")
-	f.P(t(1), "const ", enumName, "(this.value);")
+	f.P(t(1), "/// proto 枚举数值（二进制 wire 编解码用，与 JSON 的 value 字符串互补）")
+	f.P(t(1), "final int wire;")
+	f.P(t(1), "const ", enumName, "(this.value, this.wire);")
 	f.P()
 	f.P(t(1), "static ", enumName, " fromString(String v) =>")
 	// Escape $ in enumName so Dart does not treat it as string interpolation.
 	escapedEnumName := strings.ReplaceAll(enumName, "$", "\\$")
 	f.P(t(2), "values.firstWhere((e) => e.value == v, orElse: () => throw ArgumentError('Unknown ", escapedEnumName, " value: ' + v));")
+	f.P(t(1), "static ", enumName, " fromWire(int v) =>")
+	f.P(t(2), "values.firstWhere((e) => e.wire == v, orElse: () => throw ArgumentError('Unknown ", escapedEnumName, " wire value: ' + v.toString()));")
 	f.P(t(1), "@override")
 	f.P(t(1), "String toString() => value;")
 	f.P("}")

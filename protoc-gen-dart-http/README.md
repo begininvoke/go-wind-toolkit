@@ -11,6 +11,7 @@
 - **传输层抽象** — 通过 `ClientTransport` 抽象接口支持任意 HTTP 客户端实现（package:http、dio 等）
 - **流式支持** — 服务端流式 RPC 映射为 SSE，双向流式 RPC 映射为 WebSocket
 - **完整的数据模型** — 自动生成 `fromJson`、`toJson`、`toString`、`==`、`hashCode`、`copyWith`
+- **二进制 proto 编解码** — 每个消息类原生生成 `writeToBuffer()` / `fromBuffer()`（配套输出根目录自包含的 `proto_wire.dart` 运行时，零第三方依赖），枚举类带 `wire` 数值与 `fromWire()`；支持标量/枚举/嵌套/repeated（packed 读写兼容单值）/map/bytes(base64)/Timestamp/Duration/FieldMask/Empty/wrapper 系列，Any/Struct/Value/ListValue 及 google.type.* 抛 UnsupportedError
 - **Well-known 类型映射** — 自动将 `google.protobuf.Timestamp` 等 Well-known 类型映射为 Dart 原生类型
 - **跨包引用** — 跨 protobuf 包的类型引用使用 PascalCase 前缀（如 `EinrideExampleSyntaxV1Message`）
 - **嵌套类型** — 使用 Dart protobuf 惯例的 `$` 分隔符（如 `Message$NestedMessage`）

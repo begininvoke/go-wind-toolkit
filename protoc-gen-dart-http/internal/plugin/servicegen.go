@@ -165,6 +165,15 @@ func generateMethodBody(
 	case rule.Body == "*":
 		if isWKT {
 			f.P(t(2), "final body = jsonEncode(request ?? {});")
+		} else if pathVars := pathVariableJSONNames(rule); len(pathVars) > 0 {
+			// Path-bound fields must not be duplicated in the body: the server
+			// binds them from the URL path, and a field arriving from both
+			// sources conflicts on its (synthetic) oneof.
+			f.P(t(2), "final bodyMap = request.toJson();")
+			for _, fp := range pathVariableJSONNames(rule) {
+				f.P(t(2), jsonMapRemoveExpr("bodyMap", rawJsonPathSegments(fp, input)))
+			}
+			f.P(t(2), "final body = jsonEncode(bodyMap);")
 		} else {
 			f.P(t(2), "final body = jsonEncode(request.toJson());")
 		}
@@ -185,6 +194,46 @@ func generateMethodBody(
 		f.P(t(2), "final body = jsonEncode(request.", dartName, "?.toJson() ?? {});")
 		return "body"
 	}
+}
+
+// pathVariableJSONNames returns the JSON name path of every field bound by
+// the path template, for exclusion from the request body. The input message
+// descriptor is only needed to resolve names; unknown fields fall back to
+// their proto names (the emitted removal then degrades to a no-op).
+func pathVariableJSONNames(rule httprule.Rule) [][]string {
+	var paths [][]string
+	seen := make(map[string]struct{})
+	for _, seg := range rule.Template.Segments {
+		if seg.Kind != httprule.SegmentKindVariable {
+			continue
+		}
+		key := seg.Variable.FieldPath.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		paths = append(paths, seg.Variable.FieldPath)
+	}
+	return paths
+}
+
+// jsonMapRemoveExpr renders a Dart expression removing a (possibly nested)
+// key from the body map produced by toJson, e.g.
+//
+//	bodyMap.remove('channelId')
+//	bodyMap['friend']?.remove('id')
+func jsonMapRemoveExpr(root string, namePath []string) string {
+	var b strings.Builder
+	b.WriteString(root)
+	for _, mid := range namePath[:len(namePath)-1] {
+		b.WriteString("['")
+		b.WriteString(mid)
+		b.WriteString("']?")
+	}
+	b.WriteString(".remove('")
+	b.WriteString(namePath[len(namePath)-1])
+	b.WriteString("');")
+	return b.String()
 }
 
 // methodUsesRequest returns true if the generated method body will reference

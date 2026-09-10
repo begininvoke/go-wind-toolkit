@@ -75,6 +75,12 @@ gow run
 gow run admin
 ```
 
+```shell
+# When the working directory is not inside any service, build and run every
+# service of the module at once (output is prefixed per service, Ctrl+C stops all)
+gow run
+```
+
 ### 4. Database-Driven Code Generation
 
 Generate complete CRUD microservice code (proto, ORM, service, server, wiring, config) from an existing database. Wiring registration follows the target service: anchor injection into the hand-written wiring.go, or wire provider sets for legacy services:
@@ -231,7 +237,24 @@ gow extract admin user -o role --orm gorm
 ### `gow run` — Run Service
 
 ```shell
+# Run the named service, or the service containing the working directory;
+# otherwise build and run every service of the module at once, with per-service
+# prefixed output; Ctrl+C stops all of them.
 gow run [service-name]
+```
+
+### `gow build` — Build Services (cross-compilation supported)
+
+```shell
+# Build every service (output goes to each service's bin/ directory by default)
+gow build
+
+# Build selected services
+gow build admin
+
+# Cross compilation: every GOOS×GOARCH combination, binaries carry a
+# _<goos>_<goarch> suffix; --out redirects all output into one directory
+gow build --os linux,windows --arch amd64 --out ./dist
 ```
 
 ### `gow ent` — Ent Code Generation

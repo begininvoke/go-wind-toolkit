@@ -75,6 +75,12 @@ gow run
 gow run admin
 ```
 
+```shell
+# 当前目录不在任一服务内时,一并编译并运行模块内全部服务
+# (各服务输出带名称前缀,Ctrl+C 一并停止全部)
+gow run
+```
+
 ### 4. 数据库驱动代码生成
 
 从现有数据库生成完整的 CRUD 微服务代码（proto、ORM、service、server、装配、config）。装配按目标服务形态分流：手写装配服务注入 wiring.go 锚点，旧式 wire 服务更新 provider 集：
@@ -237,7 +243,22 @@ gow extract admin user -o role --orm gorm
 ### `gow run` — 运行服务
 
 ```shell
+# 运行指定服务;当前目录在某服务内时运行该服务;
+# 否则一并编译并运行模块内全部服务,输出按服务名加前缀,Ctrl+C 一并停止。
 gow run [service-name]
+```
+
+### `gow build` — 编译服务（支持交叉编译）
+
+```shell
+# 编译全部服务(默认输出到各服务 bin/ 目录)
+gow build
+
+# 编译指定服务
+gow build admin
+
+# 交叉编译:GOOS×GOARCH 全组合,产物带 _<goos>_<goarch> 后缀;--out 集中到单目录
+gow build --os linux,windows --arch amd64 --out ./dist
 ```
 
 ### `gow ent` — Ent 代码生成

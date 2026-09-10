@@ -200,3 +200,28 @@ func IsValidServiceName(projectRootPath, serviceName string) (bool, error) {
 
 	return hasCmd && hasConfigs, nil
 }
+
+// ListServiceNames 枚举 projectRootPath 下全部有效服务名称
+// (app/<name>/service 同时具备 cmd/server 与 configs 者)。无有效服务时返回空切片。
+func ListServiceNames(projectRootPath string) ([]string, error) {
+	appDir := filepath.Join(projectRootPath, "app")
+	entries, err := os.ReadDir(appDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var names []string
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		valid, err := IsValidServiceName(projectRootPath, entry.Name())
+		if err != nil {
+			return nil, err
+		}
+		if valid {
+			names = append(names, entry.Name())
+		}
+	}
+	return names, nil
+}

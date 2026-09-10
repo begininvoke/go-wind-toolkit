@@ -34,5 +34,5 @@ func NewGormClient(ctx *bootstrap.Context) (*gormCrud.Client, error) {
 
 	dao.SetDefault(gormClient.DB)
 
-	return nil, err
+	return gormClient, nil
 }

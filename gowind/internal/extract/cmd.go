@@ -21,7 +21,7 @@ var (
 var CmdExtract = &cobra.Command{
 	Use:   "extract <source-service> <target-service> --obj <model> [--obj <model>...]",
 	Short: "extract service modules from one service to another",
-	Long: `Extract service modules (schema, repo, service, wire, server) from source service to target service.
+	Long: `Extract service modules (schema, repo, service, wiring, server) from source service to target service. Registration follows the target service form (anchor injection or legacy wire sets).
 
 This is used for microservice evolution — gradually splitting a monolithic service
 into smaller, independently deployable services.

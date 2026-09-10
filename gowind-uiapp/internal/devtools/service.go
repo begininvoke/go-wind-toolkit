@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/pkg/service"
 )
 
 // CommandResult 命令执行结果
@@ -215,6 +217,11 @@ func RunWire(projectRoot, serviceName string) *CommandResult {
 		return &CommandResult{Success: false, Error: fmt.Sprintf("服务 %s 的 cmd/server 目录不存在", serviceName)}
 	}
 
+	// 手写装配的服务没有 wire.go,wire 无事可做。
+	if _, err := os.Stat(filepath.Join(serverPath, "wire.go")); os.IsNotExist(err) {
+		return &CommandResult{Success: true, Output: fmt.Sprintf("服务 %s 未使用 wire(手写装配),跳过 wire 生成", serviceName)}
+	}
+
 	// 先运行 go mod tidy 确保 go.mod 是最新的，避免 wire 报错
 	if tidyResult := RunGoModTidy(projectRoot); !tidyResult.Success {
 		return &CommandResult{Success: false, Error: fmt.Sprintf("go mod tidy 失败: %s", tidyResult.Error)}
@@ -361,9 +368,24 @@ func AddService(projectRoot string, opts AddServiceOptions) *CommandResult {
 	var allOutput strings.Builder
 	allOutput.WriteString(fmt.Sprintf("正在创建服务: %s\n", opts.ServiceName))
 
-	// 生成各层代码
-	gen := NewServiceGenerator(modPath, projectName, opts.ServiceName, projectRoot, servers, dbClients)
-	if err := gen.Generate(); err != nil {
+	// 生成各层代码(统一走 gowind 生成库,默认产出手写装配骨架)
+	if err := service.Generate(context.Background(), service.GeneratorOptions{
+		GenerateMain:     true,
+		GenerateServer:   true,
+		GenerateService:  true,
+		GenerateData:     true,
+		GenerateMakefile: true,
+		GenerateConfigs:  true,
+
+		ProjectName:   projectName,
+		ProjectModule: modPath,
+		ServiceName:   opts.ServiceName,
+
+		Servers:   servers,
+		DbClients: dbClients,
+
+		OutputPath: projectRoot,
+	}); err != nil {
 		return &CommandResult{Success: false, Output: allOutput.String(), Error: fmt.Sprintf("服务生成失败: %v", err)}
 	}
 

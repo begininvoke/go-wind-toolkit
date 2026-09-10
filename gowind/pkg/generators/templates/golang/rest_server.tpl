@@ -3,14 +3,7 @@ package server
 import (
 	"github.com/go-kratos/kratos/v2/middleware"
 	"github.com/go-kratos/kratos/v2/middleware/logging"
-	"github.com/go-kratos/kratos/v2/middleware/selector"
 	"github.com/go-kratos/kratos/v2/transport/http"
-
-	authzEngine "github.com/tx7do/kratos-authz/engine"
-	authz "github.com/tx7do/kratos-authz/middleware"
-
-	authnEngine "github.com/tx7do/kratos-authn/engine"
-	authn "github.com/tx7do/kratos-authn/engine"
 
 	swaggerUI "github.com/tx7do/kratos-swagger-ui"
 
@@ -20,7 +13,6 @@ import (
 	"{{.Module}}/app/{{lower .Service}}/service/cmd/server/assets"
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
 	{{apiPackageAlias (lower .Service) .ApiPackageVersion}} "{{.Module}}/api/gen/go/{{lower .Service}}/service/{{lower .ApiPackageVersion}}"
-	"{{.Module}}/pkg/middleware/auth"
 )
 
 type RestMiddlewares []middleware.Middleware
@@ -28,20 +20,9 @@ type RestMiddlewares []middleware.Middleware
 // NewRestMiddleware 创建中间件
 func NewRestMiddleware(
 	ctx *bootstrap.Context,
-	authenticator authnEngine.Authenticator,
-	authorizer authzEngine.Engine,
 ) RestMiddlewares {
 	var ms []middleware.Middleware
 	ms = append(ms, logging.Server(ctx.GetLogger()))
-
-	// add white list for authentication.
-	rpc.AddWhiteList()
-
-	ms = append(ms, selector.Server(
-		authn.Server(authenticator),
-		auth.Server(),
-		authz.Server(authorizer),
-	).Match(rpc.NewRestWhiteListMatcher()).Build())
 
 	return ms
 }
@@ -50,11 +31,11 @@ func NewRestMiddleware(
 func NewRestServer(
 	ctx *bootstrap.Context,
 
-    middlewares []middleware.Middleware,
-	authorizer authzEngine.Engine,
+	middlewares RestMiddlewares,
 {{range $key, $value := .Services}}
-    {{lower $key}}Service *service.{{pascal $key}}Service,
+	{{camel $key}}Service *service.{{pascal $key}}Service,
 {{- end}}
+	// register:param ── 新模块服务形参在此行后注册(make register 工具锚点,勿删)
 ) (*http.Server, error) {
 	cfg := ctx.GetConfig()
 
@@ -67,8 +48,10 @@ func NewRestServer(
 		return nil, err
 	}
 {{range $key, $value := .Services}}
-    {{apiPackageAlias (lower $.Service) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceHTTPServer(srv, {{lower $key}}Service)
+	{{apiPackageAlias (lower $.Service) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceHTTPServer(srv, {{camel $key}}Service)
 {{- end}}
+
+	// register:route ── 新模块路由在此行后注册(make register 工具锚点,勿删)
 
 	if cfg.GetServer().GetRest().GetEnableSwagger() {
 		swaggerUI.RegisterSwaggerUIServerWithOption(
@@ -77,9 +60,6 @@ func NewRestServer(
 			swaggerUI.WithMemoryData(assets.OpenApiData, "yaml"),
 		)
 	}
-
-    if authorizer != nil {
-    }
 
 	return srv, nil
 }

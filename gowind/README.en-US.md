@@ -77,7 +77,7 @@ gow run admin
 
 ### 4. Database-Driven Code Generation
 
-Generate complete CRUD microservice code (proto, ORM, service, server, wire, config) from an existing database:
+Generate complete CRUD microservice code (proto, ORM, service, server, wiring, config) from an existing database. Wiring registration follows the target service: anchor injection into the hand-written wiring.go, or wire provider sets for legacy services:
 
 ```shell
 # Interactive (prompts for DSN and service name)
@@ -175,7 +175,7 @@ Flags:
 
 ### `gow generate` — Database-Driven Code Generation
 
-Generate complete Kratos microservice code (proto, ORM, service, server, wire, config) from database schema.
+Generate complete Kratos microservice code (proto, ORM, service, server, wiring, config) from database schema.
 
 ```shell
 gow generate [flags]
@@ -200,7 +200,7 @@ Flags:
 
 ### `gow extract` — Microservice Module Extraction
 
-Extract business modules (schema, repo, service, wire, server) from a source service to a target service, for gradual microservice splitting and evolution. Target service scaffold is auto-created if it doesn't exist. ORM type is auto-detected from source service directory structure.
+Extract business modules (schema, repo, service, wiring, server) from a source service to a target service, for gradual microservice splitting and evolution. Target service scaffold is auto-created if it doesn't exist, inheriting the source's wiring form. ORM type is auto-detected from source service directory structure.
 
 ```shell
 gow extract <source-service> <target-service> -o <model> [-o <model>...] [flags]
@@ -240,7 +240,7 @@ gow run [service-name]
 gow ent [service-name]
 ```
 
-### `gow wire` — Wire Code Generation
+### `gow wire` — Wire Code Generation (legacy services only; hand-wired services are skipped)
 
 ```shell
 gow wire [service-name]
@@ -287,7 +287,7 @@ myproject/
 
 - ✅ One-click creation of standard Kratos projects
 - ✅ One-click addition of multi-protocol microservices (gRPC + REST)
-- ✅ Database-driven CRUD code generation (proto, ORM, service, server, wire, config)
+- ✅ Database-driven CRUD code generation (proto, ORM, service, server, wiring, config)
 - ✅ Automatic generation of Ent / GORM models
 - ✅ Automatic generation of Protobuf & API definitions
 - ✅ Automatic generation of Wire dependency injection

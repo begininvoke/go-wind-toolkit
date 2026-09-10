@@ -16,7 +16,7 @@ var CmdGenerate = &cobra.Command{
 	Use:     "generate",
 	Aliases: []string{"gen"},
 	Short:   "generate CRUD code from database schema",
-	Long:    "Generate complete Kratos microservice code (proto, ORM, service, server, wire, config) from an existing database or SQL file. Example: gow generate",
+	Long:    "Generate complete Kratos microservice code (proto, ORM, service, server, wiring, config) from an existing database or SQL file. Module registration follows the target service form: anchor injection into hand-written wiring.go, or wire provider sets for legacy services. Example: gow generate",
 	Run:     run,
 }
 

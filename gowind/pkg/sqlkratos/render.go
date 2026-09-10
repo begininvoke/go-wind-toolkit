@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -260,12 +261,23 @@ func (g *Generator) WriteWireSetCode(
 	serviceName string,
 	packageName string,
 	postfix string,
-	services []string,
+	servers []string,
 ) error {
 	var newFunctions []string
-	for _, service := range services {
-		newFunction := "New" + stringcase.UpperCamelCase(service) + postfix
+	for _, server := range servers {
+		newFunction := "New" + stringcase.UpperCamelCase(server) + postfix
 		newFunctions = append(newFunctions, newFunction)
+
+		// server 层的中间件构造器与 server 构造器同属 provider 集
+		// (server 模板签名含 middlewares 形参;仅当文件中确实定义了对应构造器时登记)。
+		if packageName == "server" {
+			middlewareFunction := "server.New" + stringcase.UpperCamelCase(server) + "Middleware"
+			serverFile := filepath.Join(outputPath, strings.ToLower(server)+"_server.go")
+			if raw, err := os.ReadFile(serverFile); err == nil &&
+				strings.Contains(string(raw), "func New"+stringcase.UpperCamelCase(server)+"Middleware(") {
+				newFunctions = append(newFunctions, middlewareFunction)
+			}
+		}
 	}
 
 	opts := code_generator.Options{

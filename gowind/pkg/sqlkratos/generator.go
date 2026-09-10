@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/jinzhu/inflection"
@@ -181,6 +183,13 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 		}
 	}
 
+	// 目标服务的依赖装配形态判定:
+	//   - 既有手写装配文件(含登记锚点) → 注入式登记(wiring 模式);
+	//   - 既无装配文件又无 wire provider 集(全新服务) → 生成手写装配骨架(wiring 模式);
+	//   - 仅有 wire provider 集(旧式服务) → 沿用 wire 生成(向下兼容)。
+	// BFF(纯 rest 且不落仓储)的装配文件不含 ORM 客户端构造,探测时不再按 ORM 偏置。
+	wctx := newWiringContext(opts.OutputPath, opts.ModuleName, opts.OrmType, useGrpc, opts.UseRepo)
+
 	// 生成ORM代码
 	if opts.GenerateORM {
 		dataPackagePath := fmt.Sprintf("%s/app/%s/service/internal/", opts.OutputPath, opts.ModuleName)
@@ -201,6 +210,7 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			services,
 			opts.ModuleVersion,
 			servicePackageMap,
+			wctx,
 		); err != nil {
 			return err
 		}
@@ -220,6 +230,7 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			tables,
 			services,
 			servicePackageMap,
+			wctx,
 		); err != nil {
 			return err
 		}
@@ -236,8 +247,31 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			opts.ServiceName,
 			servicePackageMap,
 			opts.Servers,
+			opts.ModuleVersion,
+			services,
+			wctx,
 		); err != nil {
 			return err
+		}
+	}
+
+	// rest 服务(BFF)随 server 层一并生成 swagger assets 包(rest_server 模板引用之)。
+	if opts.GenerateServer {
+		hasRestServer := false
+		for _, s := range opts.Servers {
+			if strings.EqualFold(strings.TrimSpace(s), "rest") {
+				hasRestServer = true
+				break
+			}
+		}
+		if hasRestServer {
+			assetsPath := filepath.Join(opts.OutputPath, "app", opts.ModuleName, "service", "cmd", "server", "assets")
+			if _, err := g.goGenerator.GenerateAssets(ctx, code_generator.Options{
+				OutDir: assetsPath,
+				Module: opts.ProjectName,
+			}); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -265,6 +299,9 @@ func (g *Generator) Generate(ctx context.Context, opts GeneratorOptions) error {
 			opts.ProjectName,
 			opts.ServiceName,
 			opts.Servers,
+			services,
+			wctx,
+			opts,
 		); err != nil {
 			return err
 		}
@@ -356,8 +393,26 @@ func (g *Generator) generateServerPackageCode(
 	serviceName string,
 	servicePackageMap map[string]string,
 	servers []string,
+	moduleVersion string,
+	services []string,
+	wctx *wiringContext,
 ) error {
 	for _, server := range servers {
+		kind := strings.ToLower(server)
+		serverFile := filepath.Join(outputPath, kind+"_server.go")
+
+		// 既有带登记锚点的 server 文件:锚点注入新模块的形参与路由,不整体重渲,
+		// 保留项目手工维护的中间件与路由内容。
+		if wctx.useWiringDI {
+			if _, statErr := os.Stat(serverFile); statErr == nil &&
+				generators.FileHasTrimmedLine(serverFile, generators.AnchorParam) {
+				if err := g.injectServerRegistrations(serverFile, kind, projectName, serviceName, servicePackageMap, moduleVersion, wctx, services); err != nil {
+					return err
+				}
+				continue
+			}
+		}
+
 		if err := g.WriteServerPackageCode(
 			outputPath,
 			projectName, server, serviceName,
@@ -367,7 +422,122 @@ func (g *Generator) generateServerPackageCode(
 		}
 	}
 
-	return g.WriteWireSetCode(outputPath, projectName, serviceName, "server", "Server", servers)
+	if !wctx.useWiringDI {
+		return g.WriteWireSetCode(outputPath, projectName, serviceName, "server", "Server", servers)
+	}
+	return nil
+}
+
+// injectServerRegistrations 向既有的 server 文件锚点注入各模块的服务形参与路由注册,
+// 并向装配文件注入对应的服务实参。注入按 skipIf 幂等:已登记的模块自动跳过。
+func (g *Generator) injectServerRegistrations(
+	serverFile string,
+	serverKind string,
+	projectName string,
+	serviceName string,
+	servicePackageMap map[string]string,
+	moduleVersion string,
+	wctx *wiringContext,
+	models []string,
+) error {
+	for _, model := range models {
+		// 路由所属 api 域:rest 恒为 BFF 自身域;grpc 为各模块的策略域。
+		domain := strings.ToLower(serviceName)
+		if serverKind == "grpc" {
+			if m, ok := servicePackageMap[model]; ok && m != "" {
+				domain = m
+			} else {
+				domain = strings.ToLower(model)
+			}
+		}
+
+		paramLine, paramSkip := generators.BuildServerParamLine(model)
+		routeLine, routeSkip := generators.BuildRouteLine(serverKind, domain, moduleVersion, model)
+
+		if err := generators.ApplyAnchorPatches(
+			generators.AnchorPatch{
+				Path:    serverFile,
+				Anchors: []string{generators.AnchorParam},
+				Lines:   []string{paramLine},
+				SkipIf:  paramSkip,
+			},
+			generators.AnchorPatch{
+				Path:    serverFile,
+				Anchors: []string{generators.AnchorRoute},
+				Lines:   []string{routeLine},
+				SkipIf:  routeSkip,
+			},
+		); err != nil {
+			return err
+		}
+
+		// 路由引用的 api 包与 service 包 import 补齐(已存在则跳过)。
+		if err := g.goGenerator.EnsureAliasedImport(serverFile,
+			generators.ApiPackageAlias(domain, moduleVersion),
+			generators.ApiImportPath(serverKind, projectName, domain, moduleVersion)); err != nil {
+			return err
+		}
+		if err := g.goGenerator.EnsureImport(serverFile,
+			fmt.Sprintf("%s/app/%s/service/internal/service", projectName, strings.ToLower(serviceName))); err != nil {
+			return err
+		}
+
+		// 装配文件中的服务实参行。
+		if wctx.wiringFile != "" {
+			argLine, argSkip := generators.BuildServerArgLine(model)
+			if err := generators.ApplyAnchorPatches(generators.AnchorPatch{
+				Path:    wctx.wiringFile,
+				Anchors: generators.WiringAnchorCandidates("arg-" + serverKind),
+				Lines:   []string{argLine},
+				SkipIf:  argSkip,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// injectWiringServiceLine 向装配文件注入一个模块的服务层构造行。
+func (g *Generator) injectWiringServiceLine(
+	wiringFile string,
+	projectName string,
+	serviceName string,
+	model string,
+	useClient bool,
+) error {
+	line, skipIf := generators.BuildServiceWiringLine(model, useClient)
+	if err := generators.ApplyAnchorPatches(generators.AnchorPatch{
+		Path:    wiringFile,
+		Anchors: generators.WiringAnchorCandidates("service"),
+		Lines:   []string{line},
+		SkipIf:  skipIf,
+	}); err != nil {
+		return err
+	}
+	return g.goGenerator.EnsureImport(wiringFile,
+		fmt.Sprintf("%s/app/%s/service/internal/service", projectName, strings.ToLower(serviceName)))
+}
+
+// injectWiringRepoLine 向装配文件注入一个模块的仓储层构造行。
+func (g *Generator) injectWiringRepoLine(
+	wiringFile string,
+	projectName string,
+	serviceName string,
+	model string,
+	ormClientVar string,
+) error {
+	line, skipIf := generators.BuildRepoWiringLine(model, ormClientVar)
+	if err := generators.ApplyAnchorPatches(generators.AnchorPatch{
+		Path:    wiringFile,
+		Anchors: generators.WiringAnchorCandidates("repo"),
+		Lines:   []string{line},
+		SkipIf:  skipIf,
+	}); err != nil {
+		return err
+	}
+	return g.goGenerator.EnsureImport(wiringFile,
+		fmt.Sprintf("%s/app/%s/service/internal/data", projectName, strings.ToLower(serviceName)))
 }
 
 func (g *Generator) generateServicePackageCode(
@@ -378,6 +548,7 @@ func (g *Generator) generateServicePackageCode(
 	tables sqlproto.TableDataArray,
 	services []string,
 	servicePackageMap map[string]string,
+	wctx *wiringContext,
 ) error {
 
 	for _, table := range tables {
@@ -416,7 +587,17 @@ func (g *Generator) generateServicePackageCode(
 		}
 	}
 
-	return g.WriteWireSetCode(outputPath, projectName, serviceName, "service", "Service", services)
+	if !wctx.useWiringDI {
+		return g.WriteWireSetCode(outputPath, projectName, serviceName, "service", "Service", services)
+	}
+	if wctx.wiringFile != "" {
+		for _, model := range services {
+			if err := g.injectWiringServiceLine(wctx.wiringFile, projectName, serviceName, model, wctx.isBff); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func (g *Generator) generateDataPackageCode(
@@ -427,6 +608,7 @@ func (g *Generator) generateDataPackageCode(
 	services []string,
 	moduleVersion string,
 	servicePackageMap map[string]string,
+	wctx *wiringContext,
 ) error {
 	if len(tables) == 0 {
 		return nil
@@ -499,23 +681,33 @@ func (g *Generator) generateDataPackageCode(
 		}
 	}
 
-	// 生成 data 层 wire_set（client 用 client. 前缀，repo 用 data. 前缀）
-	var clientFunctions []string
-	switch orm {
-	case "ent":
-		clientFunctions = append(clientFunctions, "client.NewEntClient")
-	case "gorm":
-		clientFunctions = append(clientFunctions, "client.NewGormClient")
+	// 装配登记:旧式 wire 服务写入 provider 集;手写装配服务向装配文件锚点注入仓储构造行。
+	if !wctx.useWiringDI {
+		var clientFunctions []string
+		switch orm {
+		case "ent":
+			clientFunctions = append(clientFunctions, "client.NewEntClient")
+		case "gorm":
+			clientFunctions = append(clientFunctions, "client.NewGormClient")
+		}
+
+		var allFunctions []string
+		allFunctions = append(allFunctions, clientFunctions...)
+		for _, svc := range services {
+			allFunctions = append(allFunctions, fmt.Sprintf("data.New%sRepo", stringcase.UpperCamelCase(svc)))
+		}
+
+		return g.WriteDataWireSetCode(outputPath, projectName, serviceName, allFunctions)
 	}
 
-	// 合并 client 和 repo 函数到一个 wire_set
-	var allFunctions []string
-	allFunctions = append(allFunctions, clientFunctions...)
-	for _, svc := range services {
-		allFunctions = append(allFunctions, fmt.Sprintf("data.New%sRepo", stringcase.UpperCamelCase(svc)))
+	if wctx.wiringFile != "" && !wctx.isBff && orm != "" {
+		for _, model := range services {
+			if err := g.injectWiringRepoLine(wctx.wiringFile, projectName, serviceName, model, wctx.ormClientVar); err != nil {
+				return err
+			}
+		}
 	}
-
-	return g.WriteDataWireSetCode(outputPath, projectName, serviceName, allFunctions)
+	return nil
 }
 
 func (g *Generator) generateMainPackageCode(
@@ -524,6 +716,9 @@ func (g *Generator) generateMainPackageCode(
 	projectName string, serviceName string,
 
 	servers []string,
+	services []string,
+	wctx *wiringContext,
+	opts GeneratorOptions,
 ) error {
 	if err := g.WriteMainCode(
 		outputPath,
@@ -533,10 +728,47 @@ func (g *Generator) generateMainPackageCode(
 		return err
 	}
 
-	return g.WriteWireCode(
-		outputPath,
-		projectName, serviceName,
+	if !wctx.useWiringDI {
+		return g.WriteWireCode(
+			outputPath,
+			projectName, serviceName,
+		)
+	}
+
+	// 既有装配文件保持手工维护,不重渲;全新服务渲染装配骨架。
+	if wctx.wiringFile != "" {
+		return nil
+	}
+
+	var ormForBlocks string
+	var dbClients []string
+	var repoModels []string
+	if !wctx.isBff && opts.OrmType != "" && opts.GenerateData {
+		ormForBlocks = opts.OrmType
+		dbClients = []string{opts.OrmType}
+		repoModels = append(repoModels, services...)
+	}
+	var serviceModels []string
+	if opts.GenerateService {
+		serviceModels = append(serviceModels, services...)
+	}
+
+	blocks := generators.BuildWiringBlocks(
+		servers,
+		opts.UseRepo,
+		ormForBlocks,
+		dbClients,
+		repoModels,
+		serviceModels,
 	)
+	_, err := g.goGenerator.GenerateWiring(context.Background(), code_generator.Options{
+		OutDir: outputPath,
+		Module: projectName,
+		Vars: map[string]any{
+			"Service": serviceName,
+		},
+	}, blocks)
+	return err
 }
 
 // generateConfigCode 生成配置文件 (client.yaml, server.yaml, logger.yaml, data.yaml)

@@ -34,3 +34,15 @@ bin/
 .idea/
 *.swp
 .zcode/
+
+# generator test output
+gowind/pkg/generators/output/
+gowind/pkg/service/test/
+gowind/internal/service/test/
+
+# sqlorm/sqlproto test-run artifacts
+gowind/pkg/sqlorm/internal/ent/entimport/schema/
+gowind/pkg/sqlorm/internal/gorm/daos/
+gowind/pkg/sqlorm/internal/gorm/models/
+gowind/pkg/sqlproto/api/
+gowind/pkg/sqlproto/internal/render/api/

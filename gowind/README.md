@@ -77,7 +77,7 @@ gow run admin
 
 ### 4. 数据库驱动代码生成
 
-从现有数据库生成完整的 CRUD 微服务代码（proto、ORM、service、server、wire、config）：
+从现有数据库生成完整的 CRUD 微服务代码（proto、ORM、service、server、装配、config）。装配按目标服务形态分流：手写装配服务注入 wiring.go 锚点，旧式 wire 服务更新 provider 集：
 
 ```shell
 # 交互式（会提示输入 DSN 和 service name）
@@ -132,10 +132,16 @@ gow ent
 gow ent admin
 ```
 
-#### Wire 依赖注入生成
+#### 依赖装配
+
+新建服务默认采用手写装配：`cmd/server/wiring.go` 按分层小节手写构造（基础设施 → 仓储/服务客户端 → 服务层 → 传输层），带 cleanup 的资源注册进 LIFO 回滚表，各登记位以 `register:*` 锚点注释标记，新增 CRUD 模块由生成器自动注入，无 wire 依赖。
+`gow add service --wire` 可退回旧式 wire 脚手架；`gow wire` 命令为既有 wire 形态服务保留（手写装配的服务自动跳过），向下兼容：
 
 ```shell
-# 为所有服务生成 Wire
+# 旧式 wire 脚手架（默认生成手写装配）
+gow add service admin --wire
+
+# 为所有服务生成 Wire（仅 wire 形态服务，手写装配服务自动跳过）
 gow wire
 
 # 为指定服务生成 Wire
@@ -175,7 +181,7 @@ Flags:
 
 ### `gow generate` — 数据库驱动代码生成
 
-从数据库 schema 生成完整的 Kratos 微服务代码（proto、ORM、service、server、wire、config）。
+从数据库 schema 生成完整的 Kratos 微服务代码（proto、ORM、service、server、装配、config）。
 
 ```shell
 gow generate [flags]
@@ -240,7 +246,7 @@ gow run [service-name]
 gow ent [service-name]
 ```
 
-### `gow wire` — Wire 代码生成
+### `gow wire` — Wire 代码生成（仅旧式 wire 服务；手写装配服务自动跳过）
 
 ```shell
 gow wire [service-name]
@@ -287,10 +293,10 @@ myproject/
 
 - ✅ 一键创建 Kratos 标准项目
 - ✅ 一键添加多协议微服务（gRPC + REST）
-- ✅ 数据库驱动 CRUD 代码生成（proto、ORM、service、server、wire、config）
+- ✅ 数据库驱动 CRUD 代码生成（proto、ORM、service、server、装配、config）
 - ✅ 自动生成 Ent / GORM 模型
 - ✅ 自动生成 Protobuf & API 定义
-- ✅ 自动生成 Wire 依赖注入
+- ✅ 依赖装配：手写 wiring.go 锚点式登记（默认）或 Wire provider 集（旧式，向下兼容）
 - ✅ 微服务渐进式拆分与演进（模块提取）
 - ✅ 一键运行、热重载支持
 - ✅ 统一 CLI 入口，降低学习成本

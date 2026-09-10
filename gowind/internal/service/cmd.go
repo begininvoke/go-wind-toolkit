@@ -25,6 +25,7 @@ var (
 	serviceName string
 	Servers     []string
 	DbClients   []string
+	useWireDI   bool
 )
 
 func init() {
@@ -33,6 +34,7 @@ func init() {
 
 	CmdService.Flags().StringArrayVarP(&Servers, "servers", "s", []string{"grpc"}, "Specify which server types to generate (grpc, rest, asynq, sse...)")
 	CmdService.Flags().StringArrayVarP(&DbClients, "db-clients", "d", []string{"ent"}, "Specify which database clients to generate (gorm, ent, redis, clickhouse...)")
+	CmdService.Flags().BoolVar(&useWireDI, "wire", false, "生成旧式 wire 依赖注入(wire.go + providers);默认生成手写装配 wiring.go")
 }
 
 func extractProjectName(module string) string {
@@ -95,6 +97,7 @@ func run(cmd *cobra.Command, args []string) {
 
 		Servers:   Servers,
 		DbClients: DbClients,
+		UseWireDI: useWireDI,
 
 		OutputPath: inspector.Root,
 	})

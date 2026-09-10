@@ -4,6 +4,7 @@ import _ "embed"
 
 var TemplateMap = map[string][]byte{
 	"main.tpl":         MainTemplate,
+	"wiring.tpl":       WiringTemplate,
 	"wire.tpl":         WireTemplate,
 	"wire_set.tpl":     WireSetTemplate,
 	"grpc_server.tpl":  GrpcServerTemplate,
@@ -21,6 +22,9 @@ var TemplateMap = map[string][]byte{
 
 //go:embed main.tpl
 var MainTemplate []byte
+
+//go:embed wiring.tpl
+var WiringTemplate []byte
 
 //go:embed wire.tpl
 var WireTemplate []byte

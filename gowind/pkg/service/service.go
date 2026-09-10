@@ -30,6 +30,10 @@ type GeneratorOptions struct {
 	Servers   []string
 	DbClients []string
 
+	// UseWireDI 为真时生成旧式 wire 依赖注入(wire.go + 各层 providers/wire_set.go),
+	// 与既有 wire 工程向下兼容;默认为假,生成手写装配文件(cmd/server/wiring.go)。
+	UseWireDI bool
+
 	GenerateServer   bool
 	GenerateService  bool
 	GenerateData     bool
@@ -78,6 +82,7 @@ func (g *Generator) Generate(_ context.Context, opts GeneratorOptions) error {
 			opts.ProjectModule,
 			opts.ServiceName,
 			opts.Servers,
+			opts.UseWireDI,
 		); err != nil {
 			return err
 		}
@@ -91,6 +96,7 @@ func (g *Generator) Generate(_ context.Context, opts GeneratorOptions) error {
 			opts.ProjectModule,
 			opts.ServiceName,
 			[]string{},
+			opts.UseWireDI,
 		); err != nil {
 			return err
 		}
@@ -102,10 +108,9 @@ func (g *Generator) Generate(_ context.Context, opts GeneratorOptions) error {
 		if err = g.generateDataPackageCode(
 			dataPackagePath,
 			opts.ProjectModule,
-			opts.ProjectName,
 			opts.ServiceName,
 			opts.DbClients,
-			[]string{},
+			opts.UseWireDI,
 		); err != nil {
 			return err
 		}
@@ -119,6 +124,8 @@ func (g *Generator) Generate(_ context.Context, opts GeneratorOptions) error {
 			opts.ProjectModule,
 			opts.ServiceName,
 			opts.Servers,
+			opts.UseWireDI,
+			opts.DbClients,
 		); err != nil {
 			return err
 		}
@@ -169,6 +176,7 @@ func (g *Generator) generateServerPackageCode(
 	projectModule string,
 	serviceName string,
 	servers []string,
+	useWireDI bool,
 ) error {
 	for _, server := range servers {
 		switch strings.ToLower(server) {
@@ -197,6 +205,10 @@ func (g *Generator) generateServerPackageCode(
 		}
 	}
 
+	if !useWireDI {
+		return nil
+	}
+
 	return g.writeWireSetCode(outputPath, projectModule, serviceName, "server", "Server", servers)
 }
 
@@ -205,43 +217,54 @@ func (g *Generator) generateServicePackageCode(
 	projectName string,
 	serviceName string,
 	services []string,
+	useWireDI bool,
 ) error {
+	if !useWireDI {
+		return nil
+	}
 	return g.writeWireSetCode(outputPath, projectName, serviceName, "service", "Service", services)
 }
 
 func (g *Generator) generateDataPackageCode(
 	outputPath string,
 	projectModule string,
-	projectName string,
 	serviceName string,
 	dbClients []string,
-	repos []string,
+	useWireDI bool,
 ) error {
-	o := code_generator.Options{
-		OutDir: outputPath,
-		Module: projectModule,
-		Vars: map[string]any{
-			"Service": serviceName,
-		},
-	}
-
+	// 生成数据层客户端文件(internal/data/client/*.go)。
+	clientPath := filepath.Join(outputPath, "client")
 	for _, dbClient := range dbClients {
+		o := code_generator.Options{
+			OutDir: clientPath,
+			Module: projectModule,
+			Vars: map[string]any{
+				"Service": serviceName,
+			},
+		}
 		switch strings.ToLower(dbClient) {
 		case "redis":
-			o.Vars["HasRedis"] = true
+			if _, err := g.goGenerator.GenerateRedisClient(context.Background(), o); err != nil {
+				return err
+			}
 		case "gorm":
-			o.Vars["HasGorm"] = true
+			if _, err := g.goGenerator.GenerateGormClient(context.Background(), o); err != nil {
+				return err
+			}
 		case "ent", "entgo":
-			o.Vars["HasEnt"] = true
+			if _, err := g.goGenerator.GenerateEntClient(context.Background(), o); err != nil {
+				return err
+			}
 		}
 	}
 
-	var functions []string
-	for _, repo := range repos {
-		functions = append(functions, fmt.Sprintf("New%sRepo", stringcase.UpperCamelCase(repo)))
+	if !useWireDI {
+		return nil
 	}
+
+	var functions []string
 	for _, dbClient := range dbClients {
-		functions = append(functions, fmt.Sprintf("New%sClient", stringcase.UpperCamelCase(dbClient)))
+		functions = append(functions, fmt.Sprintf("client.New%sClient", stringcase.UpperCamelCase(dbClient)))
 	}
 	return g.writeWireSetFunctionCode(outputPath, projectModule, serviceName, "data", functions)
 }
@@ -250,6 +273,8 @@ func (g *Generator) generateMainPackageCode(
 	outputPath string,
 	moduleName string, serviceName string,
 	servers []string,
+	useWireDI bool,
+	dbClients []string,
 ) error {
 	opts := code_generator.Options{
 		OutDir: outputPath,
@@ -267,10 +292,23 @@ func (g *Generator) generateMainPackageCode(
 		return err
 	}
 
-	return g.writeWireCode(
-		outputPath,
-		moduleName, serviceName,
-	)
+	if useWireDI {
+		return g.writeWireCode(
+			outputPath,
+			moduleName, serviceName,
+		)
+	}
+
+	// 手写装配骨架:分层小节、cleanup 注册表与登记锚点,初始不含任何模块登记行。
+	blocks := generators.BuildWiringBlocks(servers, false, "", dbClients, nil, nil)
+	_, err = g.goGenerator.GenerateWiring(context.Background(), code_generator.Options{
+		OutDir: outputPath,
+		Module: moduleName,
+		Vars: map[string]any{
+			"Service": serviceName,
+		},
+	}, blocks)
+	return err
 }
 
 // writeMakefile 生成默认的 Makefile 到指定目录。
@@ -407,12 +445,22 @@ func (g *Generator) writeWireSetCode(
 	serviceName string,
 	packageName string,
 	postfix string,
-	services []string,
+	servers []string,
 ) error {
 	var newFunctions []string
-	for _, service := range services {
-		funcName := "New" + stringcase.ToPascalCase(service) + postfix
+	for _, server := range servers {
+		funcName := "New" + stringcase.ToPascalCase(server) + postfix
 		newFunctions = append(newFunctions, funcName)
+
+		// server 层的中间件构造器与 server 构造器同属 provider 集
+		// (server 模板签名含 middlewares 形参;仅当文件中确实定义了对应构造器时登记)。
+		if packageName == "server" {
+			serverFile := filepath.Join(outputPath, strings.ToLower(server)+"_server.go")
+			if raw, err := os.ReadFile(serverFile); err == nil &&
+				strings.Contains(string(raw), "func New"+stringcase.ToPascalCase(server)+"Middleware(") {
+				newFunctions = append(newFunctions, "server.New"+stringcase.ToPascalCase(server)+"Middleware")
+			}
+		}
 	}
 
 	opts := code_generator.Options{

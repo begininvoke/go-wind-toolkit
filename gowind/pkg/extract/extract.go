@@ -112,6 +112,10 @@ func (e *Extractor) ensureTargetService() error {
 		Servers:   servers,
 		DbClients: dbClients,
 
+		// 目标服务继承源服务的装配形态:wire 工程内迁移保持 wire,其余采用手写装配。
+		UseWireDI: generators.WireProvidersExist(e.sourceServicePath()) &&
+			generators.FindWiringFile(filepath.Join(e.sourceServicePath(), "cmd", "server"), "") == "",
+
 		OutputPath: e.opts.RootPath,
 	}
 
@@ -143,8 +147,9 @@ func (e *Extractor) extractModel(model string) error {
 		return err
 	}
 
-	// 4. 在目标端 wire providers 中注入 New 函数
-	if err := e.addTargetWireProviders(model); err != nil {
+	// 4. 在目标端登记模块构造行(wire provider 集 或 装配文件锚点,按目标服务形态)
+	tctx := e.targetWiringContextFor(model)
+	if err := e.addTargetRegistrations(model, tctx); err != nil {
 		return err
 	}
 
@@ -214,25 +219,94 @@ func (e *Extractor) extractService(model string) error {
 }
 
 // ==============================
-// wire providers 注入
+// 目标端装配形态
 // ==============================
 
-func (e *Extractor) addTargetWireProviders(model string) error {
+// targetContext 描述目标服务的依赖装配形态。仓库型模块注入仓储+服务构造行;
+// BFF 型(拷贝来的服务文件不引用 internal/data)注入服务构造行,其数据源变量为服务客户端。
+type targetContext struct {
+	wiringFile   string
+	wireMode     bool
+	ormClientVar string
+	useClient    bool
+}
+
+func (e *Extractor) targetWiringContextFor(model string) targetContext {
+	var tctx targetContext
+
+	serviceFile := filepath.Join(e.targetServicePath(), "internal", "service", stringcase.SnakeCase(model)+"_service.go")
+	tctx.useClient = true
+	if raw, err := os.ReadFile(serviceFile); err == nil {
+		tctx.useClient = !strings.Contains(string(raw), `"/internal/data"`)
+	}
+
+	pref := ""
+	if !tctx.useClient {
+		pref = e.opts.OrmType
+	}
+	tctx.wiringFile = generators.FindWiringFile(filepath.Join(e.targetServicePath(), "cmd", "server"), pref)
+	tctx.wireMode = tctx.wiringFile == "" && generators.WireProvidersExist(e.targetServicePath())
+	if tctx.wiringFile != "" && !tctx.useClient && e.opts.OrmType != "" {
+		tctx.ormClientVar = generators.DetectOrmClientVar(tctx.wiringFile, e.opts.OrmType)
+	}
+	return tctx
+}
+
+// ==============================
+// 目标端模块登记
+// ==============================
+
+func (e *Extractor) addTargetRegistrations(model string, tctx targetContext) error {
 	modelPascal := stringcase.ToPascalCase(model)
 
-	dataProviderFile := filepath.Join(e.targetServicePath(), "internal", "data", "providers", "wire_set.go")
-	repoFunc := "data.New" + modelPascal + "Repo"
-	if err := e.upsertProvider(dataProviderFile, repoFunc); err != nil {
-		return fmt.Errorf("add repo to data providers: %w", err)
+	// 旧式 wire 服务:写入 provider 集。
+	if tctx.wireMode {
+		dataProviderFile := filepath.Join(e.targetServicePath(), "internal", "data", "providers", "wire_set.go")
+		repoFunc := "data.New" + modelPascal + "Repo"
+		if err := e.upsertProvider(dataProviderFile, repoFunc); err != nil {
+			return fmt.Errorf("add repo to data providers: %w", err)
+		}
+
+		svcProviderFile := filepath.Join(e.targetServicePath(), "internal", "service", "providers", "wire_set.go")
+		svcFunc := "service.New" + modelPascal + "Service"
+		if err := e.upsertProvider(svcProviderFile, svcFunc); err != nil {
+			return fmt.Errorf("add service to service providers: %w", err)
+		}
+		return nil
 	}
 
-	svcProviderFile := filepath.Join(e.targetServicePath(), "internal", "service", "providers", "wire_set.go")
-	svcFunc := "service.New" + modelPascal + "Service"
-	if err := e.upsertProvider(svcProviderFile, svcFunc); err != nil {
-		return fmt.Errorf("add service to service providers: %w", err)
+	// 手写装配服务:锚点注入构造行。
+	if tctx.wiringFile == "" {
+		return fmt.Errorf("target service %s has neither wiring anchors nor wire providers", e.opts.TargetService)
 	}
 
-	return nil
+	if !tctx.useClient && e.opts.OrmType != "" {
+		repoLine, repoSkip := generators.BuildRepoWiringLine(model, tctx.ormClientVar)
+		if err := generators.ApplyAnchorPatches(generators.AnchorPatch{
+			Path:    tctx.wiringFile,
+			Anchors: generators.WiringAnchorCandidates("repo"),
+			Lines:   []string{repoLine},
+			SkipIf:  repoSkip,
+		}); err != nil {
+			return err
+		}
+		if err := e.goGen.EnsureImport(tctx.wiringFile,
+			fmt.Sprintf("%s/app/%s/service/internal/data", e.opts.ModulePath, strings.ToLower(e.opts.TargetService))); err != nil {
+			return err
+		}
+	}
+
+	serviceLine, serviceSkip := generators.BuildServiceWiringLine(model, tctx.useClient)
+	if err := generators.ApplyAnchorPatches(generators.AnchorPatch{
+		Path:    tctx.wiringFile,
+		Anchors: generators.WiringAnchorCandidates("service"),
+		Lines:   []string{serviceLine},
+		SkipIf:  serviceSkip,
+	}); err != nil {
+		return err
+	}
+	return e.goGen.EnsureImport(tctx.wiringFile,
+		fmt.Sprintf("%s/app/%s/service/internal/service", e.opts.ModulePath, strings.ToLower(e.opts.TargetService)))
 }
 
 // ==============================
@@ -240,16 +314,22 @@ func (e *Extractor) addTargetWireProviders(model string) error {
 // ==============================
 
 func (e *Extractor) updateTargetServer() error {
+	// 目标端装配形态按首个模型判定(同一次提取的所有模型同型)。
+	var tctx targetContext
+	if len(e.opts.Models) > 0 {
+		tctx = e.targetWiringContextFor(e.opts.Models[0])
+	}
+
 	grpcServerFile := filepath.Join(e.targetServicePath(), "internal", "server", "grpc_server.go")
 	if isFileExists(grpcServerFile) {
-		if err := e.addServiceToGrpcServer(grpcServerFile); err != nil {
+		if err := e.addServiceToGrpcServer(grpcServerFile, tctx); err != nil {
 			return fmt.Errorf("update grpc server: %w", err)
 		}
 	}
 
 	restServerFile := filepath.Join(e.targetServicePath(), "internal", "server", "rest_server.go")
 	if isFileExists(restServerFile) {
-		if err := e.addServiceToRestServer(restServerFile); err != nil {
+		if err := e.addServiceToRestServer(restServerFile, tctx); err != nil {
 			return fmt.Errorf("update rest server: %w", err)
 		}
 	}
@@ -295,6 +375,15 @@ func (e *Extractor) cleanupSourceModel(model string) error {
 
 	svcFile := filepath.Join(e.sourceServicePath(), "internal", "service", modelSnake+"_service.go")
 	_ = os.Remove(svcFile)
+
+	// 手写装配形态的源端清理:移除装配文件中该模块的全部登记行。
+	if wiringFiles, globErr := filepath.Glob(filepath.Join(e.sourceServicePath(), "cmd", "server", "wiring*.go")); globErr == nil {
+		for _, wf := range wiringFiles {
+			if rmErr := generators.RemoveWiringModuleLines(wf, model); rmErr != nil {
+				return rmErr
+			}
+		}
+	}
 
 	dataProviderFile := filepath.Join(e.sourceServicePath(), "internal", "data", "providers", "wire_set.go")
 	_ = e.removeProvider(dataProviderFile, "data.New"+modelPascal+"Repo")
@@ -378,10 +467,69 @@ func (e *Extractor) removeProvider(filePath string, functionCall string) error {
 }
 
 // ==============================
+// 锚点注入(server 文件形参/路由 + 装配文件实参)
+// ==============================
+
+// injectServerFileAnchors 向带登记锚点的 server 文件注入各模块的形参与路由注册行,
+// 并向装配文件注入对应的服务实参行。注入按 skipIf 幂等。
+// 迁移语义与既有标记注入一致:路由域与别名取目标服务自身的域。
+func (e *Extractor) injectServerFileAnchors(serverFile string, serverKind string, tctx targetContext) error {
+	domain := strings.ToLower(e.opts.TargetService)
+	for _, model := range e.opts.Models {
+		paramLine, paramSkip := generators.BuildServerParamLine(model)
+		routeLine, routeSkip := generators.BuildRouteLine(serverKind, domain, "v1", model)
+		if err := generators.ApplyAnchorPatches(
+			generators.AnchorPatch{
+				Path:    serverFile,
+				Anchors: []string{generators.AnchorParam},
+				Lines:   []string{paramLine},
+				SkipIf:  paramSkip,
+			},
+			generators.AnchorPatch{
+				Path:    serverFile,
+				Anchors: []string{generators.AnchorRoute},
+				Lines:   []string{routeLine},
+				SkipIf:  routeSkip,
+			},
+		); err != nil {
+			return err
+		}
+
+		if err := e.goGen.EnsureAliasedImport(serverFile,
+			generators.ApiPackageAlias(domain, "v1"),
+			generators.ApiImportPath(serverKind, e.opts.ModulePath, domain, "v1")); err != nil {
+			return err
+		}
+		if err := e.goGen.EnsureImport(serverFile,
+			fmt.Sprintf("%s/app/%s/service/internal/service", e.opts.ModulePath, domain)); err != nil {
+			return err
+		}
+
+		if tctx.wiringFile != "" {
+			argLine, argSkip := generators.BuildServerArgLine(model)
+			if err := generators.ApplyAnchorPatches(generators.AnchorPatch{
+				Path:    tctx.wiringFile,
+				Anchors: generators.WiringAnchorCandidates("arg-" + serverKind),
+				Lines:   []string{argLine},
+				SkipIf:  argSkip,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// ==============================
 // grpc server 注入
 // ==============================
 
-func (e *Extractor) addServiceToGrpcServer(filePath string) error {
+func (e *Extractor) addServiceToGrpcServer(filePath string, tctx targetContext) error {
+	// 手写装配形态:锚点注入形参与路由。
+	if tctx.wiringFile != "" && generators.FileHasTrimmedLine(filePath, generators.AnchorParam) {
+		return e.injectServerFileAnchors(filePath, "grpc", tctx)
+	}
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err
@@ -430,7 +578,12 @@ func (e *Extractor) addServiceToGrpcServer(filePath string) error {
 // rest server 注入
 // ==============================
 
-func (e *Extractor) addServiceToRestServer(filePath string) error {
+func (e *Extractor) addServiceToRestServer(filePath string, tctx targetContext) error {
+	// 手写装配形态:锚点注入形参与路由。
+	if tctx.wiringFile != "" && generators.FileHasTrimmedLine(filePath, generators.AnchorParam) {
+		return e.injectServerFileAnchors(filePath, "rest", tctx)
+	}
+
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return err

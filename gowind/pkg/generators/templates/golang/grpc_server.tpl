@@ -10,7 +10,7 @@ import (
 
 	"{{.Module}}/app/{{lower .Service}}/service/internal/service"
 {{range $key, $value := .Packages}}
-    {{apiPackageAlias (lower $value) $.ApiPackageVersion}} "{{lower $.Module}}/api/gen/go/{{lower $value}}/service/{{lower $.ApiPackageVersion}}"
+	{{apiPackageAlias (lower $value) $.ApiPackageVersion}} "{{lower $.Module}}/api/gen/go/{{lower $value}}/service/{{lower $.ApiPackageVersion}}"
 {{- end}}
 )
 
@@ -25,9 +25,12 @@ func NewGrpcMiddleware(ctx *bootstrap.Context) GrpcMiddlewares {
 // NewGrpcServer creates a gRPC server.
 func NewGrpcServer(
 	ctx *bootstrap.Context,
+
+	middlewares GrpcMiddlewares,
 {{range $key, $value := .Services}}
-    {{lower $key}}Service *service.{{pascal $key}}Service,
+	{{camel $key}}Service *service.{{pascal $key}}Service,
 {{- end}}
+	// register:param ── 新模块服务形参在此行后注册(make register 工具锚点,勿删)
 ) (*grpc.Server, error) {
 	cfg := ctx.GetConfig()
 
@@ -37,14 +40,16 @@ func NewGrpcServer(
 
 	srv, err := rpc.CreateGrpcServer(
 		cfg,
-		logging.Server(ctx.GetLogger()),
+		middlewares...,
 	)
 	if err != nil {
 		return nil, err
 	}
 {{range $key, $value := .Services}}
-    {{apiPackageAlias (lower $value) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceServer(srv, {{lower $key}}Service)
+	{{apiPackageAlias (lower $value) $.ApiPackageVersion}}.Register{{pascal $key}}ServiceServer(srv, {{camel $key}}Service)
 {{- end}}
+
+	// register:route ── 新模块路由在此行后注册(make register 工具锚点,勿删)
 
 	return srv, nil
 }

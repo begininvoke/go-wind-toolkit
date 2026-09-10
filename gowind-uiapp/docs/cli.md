@@ -64,8 +64,8 @@ gowind-cli db columns --dsn "..." --table sys_user
 # [{"table":"user","service":"identity"},
 #  {"table":"role","service":"permission","protoPackage":"permission.service.v1"}]
 
-# 生成 gRPC 全栈（proto+ent+service+server+wire+config），并自动执行
-# go mod tidy -> buf generate -> ent generate -> wire
+# 生成 gRPC 全栈（proto+ent+service+server+装配+config），并自动执行
+# go mod tidy -> buf generate -> ent generate（wire 仅对旧式 wire 服务执行，手写装配服务跳过）
 gowind-cli backend grpc \
   --ddl schema.sql \
   --mapping tables.json \
@@ -170,7 +170,7 @@ gowind-cli dev buf                     # api 目录 buf generate
 gowind-cli dev tidy                    # go mod tidy
 gowind-cli dev ent                     # 全服务 ent generate
 gowind-cli dev ent identity            # 单服务
-gowind-cli dev wire identity           # wire（全服务时不带参数）
+gowind-cli dev wire identity           # wire（仅旧式 wire 服务；手写装配服务自动跳过，全服务时不带参数）
 ```
 
 ---

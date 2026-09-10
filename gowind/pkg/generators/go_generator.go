@@ -45,6 +45,28 @@ func (g *GoGenerator) GenerateWire(ctx context.Context, opts code_generator.Opti
 	return g.Generate(ctx, opts, "wire.tpl")
 }
 
+// GenerateWiring 渲染手写装配文件骨架(wiring.go),含分层小节、cleanup 注册表与登记锚点。
+// blocks 为各分节内容,由 BuildWiringBlocks 构造。
+func (g *GoGenerator) GenerateWiring(ctx context.Context, opts code_generator.Options, blocks WiringBlocks) (outputPath string, err error) {
+	if g.CodeGenerator == nil {
+		return "", os.ErrInvalid
+	}
+	if opts.Vars == nil {
+		opts.Vars = map[string]any{}
+	}
+	opts.Vars["HeaderComment"] = blocks.HeaderComment
+	opts.Vars["InfraBlock"] = blocks.InfraBlock
+	opts.Vars["RepoBlock"] = blocks.RepoBlock
+	opts.Vars["ServiceBlock"] = blocks.ServiceBlock
+	opts.Vars["TransportBlock"] = blocks.TransportBlock
+	opts.Vars["NewAppArgs"] = blocks.NewAppArgs
+	opts.Vars["ImportData"] = blocks.ImportData
+	opts.Vars["ImportClient"] = blocks.ImportClient
+	opts.Vars["ImportServer"] = blocks.ImportServer
+	opts.Vars["ImportServicePkg"] = blocks.ImportServicePkg
+	return g.Generate(ctx, opts, "wiring.tpl")
+}
+
 func (g *GoGenerator) GenerateWireSet(ctx context.Context, opts code_generator.Options) (outputPath string, err error) {
 	if g.CodeGenerator == nil {
 		return "", os.ErrInvalid
@@ -430,6 +452,20 @@ func (g *GoGenerator) UpsertProviderSetFunctions(filePath string, functionCalls 
 
 // EnsureImport 确保文件中包含指定的 import 路径，不存在则添加
 func (g *GoGenerator) EnsureImport(filePath string, importPath string) error {
+	return ensureImportLine(filePath, "", importPath)
+}
+
+// EnsureAliasedImport 确保文件中包含指定 import 的带别名形式，不存在则添加。
+// 若该路径已以任意形式(带或不带别名)存在则跳过。
+func (g *GoGenerator) EnsureAliasedImport(filePath string, alias string, importPath string) error {
+	if alias == "" {
+		return fmt.Errorf("ensure aliased import: empty alias")
+	}
+	return ensureImportLine(filePath, alias, importPath)
+}
+
+// ensureImportLine 在 import 块中追加一行 import(可选别名)。
+func ensureImportLine(filePath string, alias string, importPath string) error {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read file: %w", err)
@@ -437,7 +473,7 @@ func (g *GoGenerator) EnsureImport(filePath string, importPath string) error {
 
 	fileContent := string(content)
 
-	// 检查 import 是否已存在
+	// 该路径已以任意形式存在则跳过
 	if strings.Contains(fileContent, "\""+importPath+"\"") {
 		return nil
 	}
@@ -449,8 +485,12 @@ func (g *GoGenerator) EnsureImport(filePath string, importPath string) error {
 		return fmt.Errorf("import block not found in file")
 	}
 
-	// 在 ) 前插入新的 import
-	newImport := "\t\"" + importPath + "\"\n"
+	var newImport string
+	if alias != "" {
+		newImport = "\t" + alias + " \"" + importPath + "\"\n"
+	} else {
+		newImport = "\t\"" + importPath + "\"\n"
+	}
 	// 使用正则替换精确替换 import 块内的 )，避免替换注释中的 )
 	newContent := importPattern.ReplaceAllString(fileContent, "${1}"+newImport+"${2}")
 

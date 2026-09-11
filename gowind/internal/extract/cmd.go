@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
@@ -15,6 +16,8 @@ var (
 	extractOrmType string
 	extractKeepSrc bool
 	extractObj     []string
+	extractDryRun  bool
+	extractYes     bool
 )
 
 // CmdExtract 提取命令
@@ -42,6 +45,8 @@ func init() {
 	CmdExtract.Flags().StringArrayVarP(&extractObj, "obj", "o", nil, "object/model names to extract (comma-separated or repeated flag)")
 	CmdExtract.Flags().StringVarP(&extractOrmType, "orm", "", "", "ORM type override: ent, gorm (auto-detected by default)")
 	CmdExtract.Flags().BoolVarP(&extractKeepSrc, "keep-source", "", false, "Keep source files instead of deleting them")
+	CmdExtract.Flags().BoolVarP(&extractDryRun, "dry-run", "n", false, "Preview all file actions (copy/modify/delete) without touching anything")
+	CmdExtract.Flags().BoolVarP(&extractYes, "yes", "y", false, "Skip the deletion confirmation prompt (for scripts)")
 }
 
 func extractProjectName(module string) string {
@@ -133,6 +138,41 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		len(filtered), sourceService, targetService, ormType)
 
 	extractor := pkgExtract.NewExtractor(opts)
+
+	// 只读计划:预览 + 删除前确认的依据。
+	plan, err := extractor.Plan()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
+		return err
+	}
+	printPlan(plan)
+
+	for _, warning := range plan.Warnings {
+		_, _ = fmt.Fprintf(os.Stderr, "\033[33mWARNING: %s\033[m\n", warning)
+	}
+
+	if extractDryRun {
+		fmt.Printf("\033[36m[DRY-RUN] preview only — no files were written or deleted.\033[m\n")
+		return nil
+	}
+
+	// 删除是默认行为且不可逆:展示摘要并确认(--keep-source 非破坏性,无需确认)。
+	if !extractKeepSrc && !extractYes && len(plan.DeletedFiles) > 0 {
+		confirm := false
+		prompt := &survey.Confirm{
+			Message: fmt.Sprintf("The %d source file(s) listed above will be DELETED from [%s]. Proceed?",
+				len(plan.DeletedFiles), sourceService),
+			Default: false,
+		}
+		if err = survey.AskOne(prompt, &confirm); err != nil {
+			return fmt.Errorf("confirmation prompt unavailable (%v); re-run with --yes to skip it (or --dry-run to preview)", err)
+		}
+		if !confirm {
+			fmt.Printf("Aborted — nothing was modified.\n")
+			return nil
+		}
+	}
+
 	if err = extractor.Run(); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err
@@ -144,4 +184,36 @@ func runExtract(cmd *cobra.Command, args []string) error {
 	fmt.Printf("  Models: %s\n", strings.Join(filtered, ", "))
 
 	return nil
+}
+
+// printPlan 渲染提取计划摘要。
+func printPlan(plan *pkgExtract.Plan) {
+	if plan.TargetWillBeCreated {
+		fmt.Printf("  \033[36m+ create target service scaffold: app/%s/service\033[m\n", plan.TargetService)
+	}
+
+	fmt.Printf("  Copy %d file(s):\n", len(plan.CopyFiles))
+	for _, c := range plan.CopyFiles {
+		flag := ""
+		if c.Overwrite {
+			flag = " \033[33m(overwrite)\033[m"
+		}
+		fmt.Printf("    %s\n      -> %s%s\n", c.Src, c.Dst, flag)
+	}
+
+	if len(plan.ModifiedFiles) > 0 {
+		fmt.Printf("  Modify %d file(s):\n", len(plan.ModifiedFiles))
+		for _, f := range plan.ModifiedFiles {
+			fmt.Printf("    %s\n", f)
+		}
+	}
+
+	if !plan.KeepSource && len(plan.DeletedFiles) > 0 {
+		fmt.Printf("  \033[31mDelete %d source file(s) (use --keep-source to keep them):\033[m\n", len(plan.DeletedFiles))
+		for _, f := range plan.DeletedFiles {
+			fmt.Printf("    %s\n", f)
+		}
+	} else {
+		fmt.Printf("  Source files kept (--keep-source).\n")
+	}
 }

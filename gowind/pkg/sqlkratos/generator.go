@@ -118,6 +118,35 @@ func Generate(ctx context.Context, opts GeneratorOptions) error {
 	return g.Generate(ctx, opts)
 }
 
+// PlanTables 只读解析数据源中将被处理的表(已应用 include/exclude 过滤),
+// 不导出 proto、不生成任何文件。供 generate --dry-run 预览与校验数据源。
+func PlanTables(ctx context.Context, opts GeneratorOptions) (sqlproto.TableDataArray, error) {
+	probe := opts
+	probe.GenerateProto = false
+
+	// Convert 内部会无条件创建 proto 输出目录;预览时若该目录(及其 api 父目录)
+	// 原本不存在,结束后将其清理,保证预览零副作用。
+	protoPath := path.Join(opts.OutputPath, "/api/protos/")
+	apiDir := path.Dir(protoPath)
+	protoExisted := dirExists(protoPath)
+	apiExisted := dirExists(apiDir)
+
+	tables, err := NewGenerator().generateProtobufCode(ctx, probe)
+
+	if !protoExisted {
+		_ = os.Remove(protoPath)
+	}
+	if !apiExisted {
+		_ = os.Remove(apiDir)
+	}
+	return tables, err
+}
+
+func dirExists(dir string) bool {
+	fi, err := os.Stat(dir)
+	return err == nil && fi.IsDir()
+}
+
 type Generator struct {
 	goGenerator       *generators.GoGenerator
 	yamlGenerator     *generators.YamlGenerator

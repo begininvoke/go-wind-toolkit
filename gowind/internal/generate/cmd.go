@@ -3,6 +3,7 @@ package generate
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
@@ -34,6 +35,7 @@ var (
 	genSkipConfig    bool
 	genSkipMakefile  bool
 	genSourceModule  string
+	genDryRun        bool
 )
 
 func init() {
@@ -50,6 +52,7 @@ func init() {
 	CmdGenerate.Flags().BoolVarP(&genSkipConfig, "skip-config", "", false, "Skip config file generation")
 	CmdGenerate.Flags().BoolVarP(&genSkipMakefile, "skip-makefile", "", false, "Skip Makefile generation")
 	CmdGenerate.Flags().StringVarP(&genSourceModule, "source-module", "", "", "Source module name for REST service")
+	CmdGenerate.Flags().BoolVarP(&genDryRun, "dry-run", "n", false, "Validate the data source, resolve tables and preview the plan without writing anything")
 }
 
 func run(cmd *cobra.Command, args []string) {
@@ -117,6 +120,46 @@ func run(cmd *cobra.Command, args []string) {
 	}
 
 	fmt.Printf("Generating code for service [%s] with ORM [%s]...\n", genServiceName, genOrmType)
+
+	if genDryRun {
+		tables, terr := sqlkratos.PlanTables(cmd.Context(), opts)
+		if terr != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: resolve tables: %s\033[m\n", terr.Error())
+			return
+		}
+		fmt.Printf("Plan for service [%s]:\n", genServiceName)
+		fmt.Printf("  Source:      %s (driver: %s)\n", dsn, genDriver)
+		fmt.Printf("  ORM:         %s\n", genOrmType)
+		fmt.Printf("  Servers:     %s\n", strings.Join(genServers, ", "))
+		fmt.Printf("  API version: %s\n", genModuleVersion)
+		fmt.Printf("  Output:      %s\n", outputPath)
+		var skips []string
+		if genProtoOnly {
+			skips = append(skips, "proto-only (no server/service/ORM/config/Makefile)")
+		}
+		if genSkipORM {
+			skips = append(skips, "ORM")
+		}
+		if genSkipConfig {
+			skips = append(skips, "config")
+		}
+		if genSkipMakefile {
+			skips = append(skips, "Makefile")
+		}
+		if len(skips) > 0 {
+			fmt.Printf("  Skipped:     %s\n", strings.Join(skips, ", "))
+		}
+		fmt.Printf("  Resolved %d table(s):\n", len(tables))
+		for _, t := range tables {
+			note := ""
+			if len(t.Fields) == 0 {
+				note = "  (no fields — will be skipped)"
+			}
+			fmt.Printf("    - %s (%d field(s))%s\n", t.Name, len(t.Fields), note)
+		}
+		fmt.Printf("\033[36m[DRY-RUN] preview only — nothing was written. Re-run without --dry-run to execute.\033[m\n")
+		return
+	}
 
 	if err := sqlkratos.Generate(cmd.Context(), opts); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())

@@ -21,11 +21,23 @@ import (
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
 )
 
+// watchEnabled 对应 --watch 旗标:监听文件变更,重建并重启受影响的服务。
+var watchEnabled bool
+
+func init() {
+	CmdRun.Flags().BoolVarP(&watchEnabled, "watch", "w", false, "watch sources and configs, rebuild and restart changed services on save (hot reload)")
+}
+
 // CmdRun run project command.
 var CmdRun = &cobra.Command{
 	Use:   "run",
 	Short: "Run service project",
-	Long:  "Run service project. Example: gowind run admin",
+	Long: `Run service project. Example: gowind run admin
+
+With --watch the started services are watched: saving a .go/.yaml/.proto
+source rebuilds and restarts only the affected services (all of them for
+changes in shared module-level code). A failed rebuild keeps the old
+process running.`,
 	Run:   Run,
 }
 
@@ -85,6 +97,15 @@ func Run(cmd *cobra.Command, args []string) {
 
 		if hasCmd && hasConfigs {
 			// 当前目录即为服务目录
+			if watchEnabled {
+				if err = watchServices(inspector.Root, []watchTarget{{
+					name: deriveWatchServiceName(wd),
+					dir:  wd,
+				}}); err != nil {
+					_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
+				}
+				return
+			}
 			if err = runService(wd); err != nil {
 				return
 			}
@@ -101,7 +122,27 @@ func Run(cmd *cobra.Command, args []string) {
 			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: no valid services found under %s\033[m\n", filepath.Join(inspector.Root, "app"))
 			return
 		}
+		if watchEnabled {
+			targets := make([]watchTarget, 0, len(names))
+			for _, name := range names {
+				targets = append(targets, watchTarget{name: name, dir: filepath.Join(inspector.Root, "app", name, "service")})
+			}
+			if err = watchServices(inspector.Root, targets); err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
+			}
+			return
+		}
 		if err = runAllServices(inspector.Root, names); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
+		}
+		return
+	}
+
+	if watchEnabled {
+		if err = watchServices(inspector.Root, []watchTarget{{
+			name: serviceName,
+			dir:  filepath.Join(inspector.Root, "app", serviceName, "service"),
+		}}); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		}
 		return
@@ -167,7 +208,7 @@ func runAllServices(root string, names []string) error {
 		if err != nil {
 			return fmt.Errorf("resolve output for service '%s' failed: %w", name, err)
 		}
-		if err = build.BuildBinary(svcDir, binPath, runtime.GOOS, runtime.GOARCH); err != nil {
+		if err = build.BuildBinary(svcDir, binPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
 			return fmt.Errorf("build for service '%s' failed: %w", name, err)
 		}
 		procs = append(procs, serviceProc{name: name, svcDir: svcDir, binPath: binPath})

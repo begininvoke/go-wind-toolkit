@@ -60,7 +60,9 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }}" \
+          COMMIT=$(git rev-parse --short HEAD)
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          go build -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }} -X main.commit=${COMMIT} -X main.date=${BUILD_DATE}" \
             -o "../build/gow-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix }}" \
             ./cmd/gow
 

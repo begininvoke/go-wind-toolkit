@@ -16,6 +16,10 @@ var (
 	outputDir  string
 	targetOS   []string
 	targetArch []string
+	buildVer   string
+	ldflagsArg string
+	trimPath   bool
+	stripFlag  bool
 )
 
 // CmdBuild build 命令:编译单个、多个或全部服务,支持 GOOS/GOARCH 交叉编译。
@@ -33,7 +37,12 @@ Cross-compiled binaries carry a _<goos>_<goarch> filename suffix so the
 combinations never overwrite each other.
 
 By default binaries are written into each service's bin/ directory; --out
-redirects all output into a single directory instead.`,
+redirects all output into a single directory instead.
+
+Version stamping: generated service main packages declare "var version" —
+--version injects it via -ldflags "-X main.version=...". --ldflags passes
+extra flags through verbatim; --strip adds "-s -w" (smaller binaries);
+--trimpath removes local filesystem paths from the binary.`,
 	Run: Run,
 }
 
@@ -41,6 +50,10 @@ func init() {
 	CmdBuild.Flags().StringVarP(&outputDir, "out", "o", "", "output directory for all built binaries (default: each service's bin/)")
 	CmdBuild.Flags().StringArrayVar(&targetOS, "os", nil, "comma separated target GOOS list for cross compilation")
 	CmdBuild.Flags().StringArrayVar(&targetArch, "arch", nil, "comma separated target GOARCH list for cross compilation")
+	CmdBuild.Flags().StringVar(&buildVer, "version", "", "inject as main.version into each built service (via -ldflags -X)")
+	CmdBuild.Flags().StringVar(&ldflagsArg, "ldflags", "", "extra -ldflags passed verbatim to go build")
+	CmdBuild.Flags().BoolVar(&trimPath, "trimpath", false, "add -trimpath (remove local filesystem paths from binaries)")
+	CmdBuild.Flags().BoolVar(&stripFlag, "strip", false, "add \"-s -w\" to ldflags (strip symbol table and DWARF for smaller binaries)")
 }
 
 // buildTarget 一次构建目标。
@@ -75,6 +88,8 @@ func Run(cmd *cobra.Command, args []string) {
 		return
 	}
 
+	opts := OptionsFromFlags()
+
 	failed := false
 	for _, name := range names {
 		serviceDir := filepath.Join(inspector.Root, "app", name, "service")
@@ -85,7 +100,7 @@ func Run(cmd *cobra.Command, args []string) {
 				failed = true
 				continue
 			}
-			if err = BuildBinary(serviceDir, outPath, target.goos, target.goarch); err != nil {
+			if err = BuildBinary(serviceDir, outPath, target.goos, target.goarch, opts); err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: build for service '%s' (%s/%s) failed: %s\033[m\n", name, target.goos, target.goarch, err.Error())
 				failed = true
 				continue
@@ -200,13 +215,56 @@ func ResolveOutputPath(name string, serviceDir string, goos string, goarch strin
 	return filepath.Join(outDir, binary), nil
 }
 
+// BuildOptions 描述一次 go build 的附加选项。
+type BuildOptions struct {
+	Version  string   // 注入为服务 main 包 version 变量的版本号;空则不注入
+	Ldflags  []string // 额外 -ldflags 内容,逐段拼接
+	TrimPath bool     // 加 -trimpath
+	Strip    bool     // ldflags 追加 -s -w,剥离符号表与 DWARF
+}
+
+// OptionsFromFlags 把 build 命令旗标转换为 BuildOptions。
+// 供 build 命令使用;watch 等内部场景传零值即可。
+func OptionsFromFlags() BuildOptions {
+	var opts BuildOptions
+	opts.Version = buildVer
+	opts.TrimPath = trimPath
+	opts.Strip = stripFlag
+	if s := strings.TrimSpace(ldflagsArg); s != "" {
+		opts.Ldflags = []string{s}
+	}
+	return opts
+}
+
+// buildArgs 装配 go build 参数。纯函数,便于单测。
+func (o BuildOptions) buildArgs(outPath string) []string {
+	args := []string{"build", "-o", outPath}
+	if o.TrimPath {
+		args = append(args, "-trimpath")
+	}
+
+	var ld []string
+	if o.Version != "" {
+		ld = append(ld, "-X", "main.version="+o.Version)
+	}
+	if o.Strip {
+		ld = append(ld, "-s", "-w")
+	}
+	ld = append(ld, o.Ldflags...)
+	if len(ld) > 0 {
+		args = append(args, "-ldflags", strings.Join(ld, " "))
+	}
+
+	return append(args, "./cmd/server")
+}
+
 // BuildBinary 编译服务主程序为独立二进制。goos/goarch 为目标平台,
 // 与宿主一致即原生构建。输出路径须为绝对路径。
-func BuildBinary(serviceDir string, outPath string, goos string, goarch string) error {
+func BuildBinary(serviceDir string, outPath string, goos string, goarch string, opts BuildOptions) error {
 	g := pkg.NewGoCmd(serviceDir)
 	g.Env = []string{
 		"GOOS=" + goos,
 		"GOARCH=" + goarch,
 	}
-	return g.Run("build", "-o", outPath, "./cmd/server")
+	return g.Run(opts.buildArgs(outPath)...)
 }

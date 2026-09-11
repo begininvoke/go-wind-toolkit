@@ -1,6 +1,7 @@
 package configexporter
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -9,6 +10,9 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"time"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
 // ConfigType 远程配置中心类型
@@ -243,11 +247,47 @@ func writeConsul(endpoint, project, app, content string) error {
 	return nil
 }
 
-// writeEtcd 写入配置到 Etcd (通过 HTTP JSON API)
+// writeEtcd 写入配置到 Etcd (v3 gRPC 协议)。
+// key 约定与 Consul 一致: <project>/<app>/service/config
 func writeEtcd(endpoint, project, app, content string) error {
-	// Etcd v3 不支持原生 REST，通常需要 gRPC
-	// 这里返回提示信息，建议安装 etcdctl 或使用 Consul/Nacos
-	return fmt.Errorf("Etcd 需要 gRPC 协议支持，建议使用 cfgexp CLI 工具或切换到 Consul/Nacos")
+	endpoints := normalizeEtcdEndpoints(endpoint)
+	if len(endpoints) == 0 {
+		return fmt.Errorf("Etcd endpoint 为空")
+	}
+
+	cli, err := clientv3.New(clientv3.Config{
+		Endpoints:   endpoints,
+		DialTimeout: 5 * time.Second,
+	})
+	if err != nil {
+		return fmt.Errorf("连接 Etcd 失败: %w", err)
+	}
+	defer cli.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	key := fmt.Sprintf("%s/%s/service/config", project, app)
+	if _, err := cli.Put(ctx, key, content); err != nil {
+		return fmt.Errorf("写入 Etcd 失败: %w", err)
+	}
+	return nil
+}
+
+// normalizeEtcdEndpoints 归一化 endpoint 为 etcd 要求的 "host:port" 列表:
+// 支持逗号分隔多节点,容忍 http(s):// 前缀与尾部斜杠。
+func normalizeEtcdEndpoints(endpoint string) []string {
+	var out []string
+	for _, part := range strings.Split(endpoint, ",") {
+		part = strings.TrimSpace(part)
+		part = strings.TrimPrefix(part, "http://")
+		part = strings.TrimPrefix(part, "https://")
+		part = strings.TrimSuffix(part, "/")
+		if part != "" {
+			out = append(out, part)
+		}
+	}
+	return out
 }
 
 // writeNacos 写入配置到 Nacos

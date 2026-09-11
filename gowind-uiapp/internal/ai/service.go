@@ -14,10 +14,10 @@ type Service struct {
 	config *Config
 }
 
-// NewService 创建 AI 服务
+// NewService 创建 AI 服务,自动加载持久化配置(缺失时用默认值)。
 func NewService() *Service {
 	return &Service{
-		config: DefaultConfig(),
+		config: LoadConfig(),
 	}
 }
 
@@ -26,8 +26,18 @@ func (s *Service) GetConfig() *Config {
 	return s.config
 }
 
-// SetConfig 设置配置并重建客户端
+// SetConfig 设置配置、重建客户端并持久化到磁盘(持久化失败不影响本次生效)。
 func (s *Service) SetConfig(config *Config) {
+	s.config = config
+	s.client = NewClient(config)
+	if err := SaveConfig(config); err != nil {
+		fmt.Fprintf(os.Stderr, "WARN: AI 配置持久化失败: %v\n", err)
+	}
+}
+
+// SetConfigTransient 设置配置并重建客户端,但不持久化。
+// CLI 等由环境变量/旗标临时构造配置的场景使用,避免把临时值写进用户配置。
+func (s *Service) SetConfigTransient(config *Config) {
 	s.config = config
 	s.client = NewClient(config)
 }
@@ -56,6 +66,16 @@ func (s *Service) GenerateDDL(requirements string) (*StepResult, error) {
 	cleaned := cleanMarkdownFence(content)
 
 	return &StepResult{Success: true, Content: cleaned}, nil
+}
+
+// GenerateDDLStream GenerateDDL 的流式版本:onDelta 逐块接收增量内容,
+// 返回值与非流式版本一致(清理 markdown 围栏后的完整 DDL)。
+func (s *Service) GenerateDDLStream(requirements string, onDelta func(string)) (*StepResult, error) {
+	content, err := s.GetClient().ChatStream(ddlSystemPrompt, GetDDLPrompt(requirements), onDelta)
+	if err != nil {
+		return &StepResult{Success: false, Error: err.Error()}, err
+	}
+	return &StepResult{Success: true, Content: cleanMarkdownFence(content)}, nil
 }
 
 // PartitionMicroservices 根据 DDL 建议微服务划分
@@ -98,6 +118,19 @@ func (s *Service) ReviewCode(fileContents map[string]string) (*StepResult, error
 		return &StepResult{Success: false, Error: err.Error()}, err
 	}
 
+	return &StepResult{Success: true, Content: content}, nil
+}
+
+// ReviewCodeStream ReviewCode 的流式版本:onDelta 逐块接收增量审查意见。
+func (s *Service) ReviewCodeStream(fileContents map[string]string, onDelta func(string)) (*StepResult, error) {
+	if len(fileContents) == 0 {
+		return &StepResult{Success: false, Error: "没有可审查的代码文件"}, nil
+	}
+
+	content, err := s.GetClient().ChatStream(reviewSystemPrompt, GetReviewPrompt(fileContents), onDelta)
+	if err != nil {
+		return &StepResult{Success: false, Error: err.Error()}, err
+	}
 	return &StepResult{Success: true, Content: content}, nil
 }
 

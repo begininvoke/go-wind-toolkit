@@ -441,6 +441,31 @@ func (a *App) AIGenerateDDL(requirements string) *ai.StepResult {
 	return result
 }
 
+// AIGenerateDDLStream AIGenerateDDL 的流式版本:生成过程中的增量内容经
+// "ai:stream" 事件逐块推送(task 标识任务类型),结束发 "ai:done";
+// 返回值为完整结果。
+func (a *App) AIGenerateDDLStream(requirements string) *ai.StepResult {
+	if requirements == "" {
+		runtime.LogErrorf(a.ctx, "需求文档不能为空")
+		return &ai.StepResult{Success: false, Error: "需求文档不能为空"}
+	}
+
+	result, err := a.aiService.GenerateDDLStream(requirements, func(delta string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "ai:stream", map[string]string{"task": "ddl", "delta": delta})
+		}
+	})
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 生成 DDL 失败: %v", err)
+		runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "ddl", "success": false, "error": err.Error()})
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+
+	runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "ddl", "success": true})
+	runtime.EventsEmit(a.ctx, "ai-ddl-generated")
+	return result
+}
+
 // AIPartitionMicroservices 根据 DDL 使用 AI 建议微服务划分
 func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 	if ddl == "" {
@@ -538,6 +563,29 @@ func (a *App) AIReviewCode(fileContents map[string]string) *ai.StepResult {
 		return &ai.StepResult{Success: false, Error: err.Error()}
 	}
 
+	return result
+}
+
+// AIReviewCodeStream AIReviewCode 的流式版本:审查意见经 "ai:stream" 事件
+// 逐块推送,结束发 "ai:done";返回值为完整结果。
+func (a *App) AIReviewCodeStream(fileContents map[string]string) *ai.StepResult {
+	if len(fileContents) == 0 {
+		runtime.LogErrorf(a.ctx, "没有可审查的代码文件")
+		return &ai.StepResult{Success: false, Error: "没有可审查的代码文件"}
+	}
+
+	result, err := a.aiService.ReviewCodeStream(fileContents, func(delta string) {
+		if a.ctx != nil {
+			runtime.EventsEmit(a.ctx, "ai:stream", map[string]string{"task": "review", "delta": delta})
+		}
+	})
+	if err != nil {
+		runtime.LogErrorf(a.ctx, "AI 代码审查失败: %v", err)
+		runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": false, "error": err.Error()})
+		return &ai.StepResult{Success: false, Error: err.Error()}
+	}
+
+	runtime.EventsEmit(a.ctx, "ai:done", map[string]any{"task": "review", "success": true})
 	return result
 }
 

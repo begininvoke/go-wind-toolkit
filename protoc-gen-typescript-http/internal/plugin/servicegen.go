@@ -41,6 +41,9 @@ func (s serviceGenerator) generateInterface(f *codegen.File) {
 				return
 			}
 			generateStreamInterfaceMethod(f, s.pkg, method, rule)
+			for i := range rule.AdditionalRules {
+				Warn("method %s.%s: streaming additional binding %d skipped (streaming methods support the primary binding only)", s.service.FullName(), method.Name(), i+1)
+			}
 			return
 		}
 		commentGenerator{descriptor: method}.generateLeading(f, 1)
@@ -49,9 +52,34 @@ func (s serviceGenerator) generateInterface(f *codegen.File) {
 		f.P(t(1), method.Name(), "(")
 		f.P(t(2), "request: ", input.Reference(), ",")
 		f.P(t(1), "): Promise<", output.Reference(), ">;")
+		s.generateAltInterfaceMethods(f, method, input, output)
 	})
 	f.P("}")
 	f.P()
+}
+
+// generateAltInterfaceMethods declares one interface method per
+// additional_bindings entry, named <Method>Alt<N>.
+func (s serviceGenerator) generateAltInterfaceMethods(
+	f *codegen.File,
+	method protoreflect.MethodDescriptor,
+	input, output Type,
+) {
+	r, ok := httprule.Get(method)
+	if !ok {
+		return
+	}
+	rule, err := httprule.ParseRule(r)
+	if err != nil {
+		Warn("method %s.%s has invalid http rule: %v; additional bindings not declared", s.service.FullName(), method.Name(), err)
+		return
+	}
+	for i, additional := range rule.AdditionalRules {
+		f.P(t(1), "/** Alternate HTTP binding #", i+1, " of ", method.Name(), ": ", additional.Method, " ", templatePathString(additional), " */")
+		f.P(t(1), method.Name(), "Alt", i+1, "(")
+		f.P(t(2), "request: ", input.Reference(), ",")
+		f.P(t(1), "): Promise<", output.Reference(), ">;")
+	}
 }
 
 func (s serviceGenerator) generateClient(f *codegen.File) error {
@@ -100,13 +128,44 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	}
 	if isStreamingMethod(method) {
 		generateStreamClientMethod(f, s.pkg, method, rule)
+		for i := range rule.AdditionalRules {
+			Warn("method %s.%s: streaming additional binding %d skipped (streaming methods support the primary binding only)", s.service.FullName(), method.Name(), i+1)
+		}
 		return nil
+	}
+
+	// 每个 additional_bindings 条目生成一个 <Method>Alt<N> 成员。
+	if err := s.generateUnaryMethod(f, method, rule, string(method.Name()), outputType, 0); err != nil {
+		return err
+	}
+	for i, additional := range rule.AdditionalRules {
+		f.P()
+		if err := s.generateUnaryMethod(f, method, additional, fmt.Sprintf("%sAlt%d", method.Name(), i+1), outputType, i+1); err != nil {
+			return fmt.Errorf("generate additional binding %d: %w", i+1, err)
+		}
+	}
+	return nil
+}
+
+// generateUnaryMethod generates the client object member for one HTTP binding.
+// bindingIndex 0 is the primary binding; >0 marks an additional_bindings
+// variant whose comment advertises its route.
+func (s serviceGenerator) generateUnaryMethod(
+	f *codegen.File,
+	method protoreflect.MethodDescriptor,
+	rule httprule.Rule,
+	tsMethodName string,
+	outputType Type,
+	bindingIndex int,
+) error {
+	if bindingIndex > 0 {
+		f.P(t(2), "// Alternate HTTP binding #", bindingIndex, " of ", method.Name(), ": ", rule.Method, " ", templatePathString(rule))
 	}
 	paramName := "request"
 	if !methodUsesRequest(rule, method.Input()) {
 		paramName = "_request"
 	}
-	f.P(t(2), method.Name(), "(", paramName, ") {")
+	f.P(t(2), tsMethodName, "(", paramName, ") {")
 	generateMethodPathValidation(f, method.Input(), rule)
 	generateMethodPath(f, method.Input(), rule)
 	generateMethodBody(f, method.Input(), rule)
@@ -125,6 +184,29 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	f.P(t(3), "}) as Promise<", outputType.Reference(), ">;")
 	f.P(t(2), "},")
 	return nil
+}
+
+// templatePathString renders a binding's URL template for comments, with
+// {field.path} placeholders for path variables.
+func templatePathString(rule httprule.Rule) string {
+	parts := make([]string, 0, len(rule.Template.Segments))
+	for _, seg := range rule.Template.Segments {
+		switch seg.Kind {
+		case httprule.SegmentKindVariable:
+			parts = append(parts, "{"+seg.Variable.FieldPath.String()+"}")
+		case httprule.SegmentKindLiteral:
+			parts = append(parts, seg.Literal)
+		case httprule.SegmentKindMatchSingle:
+			parts = append(parts, "*")
+		case httprule.SegmentKindMatchMultiple:
+			parts = append(parts, "**")
+		}
+	}
+	path := "/" + strings.Join(parts, "/")
+	if rule.Template.Verb != "" {
+		path += ":" + rule.Template.Verb
+	}
+	return path
 }
 
 func generateMethodPathValidation(

@@ -93,6 +93,41 @@ import { DEFAULT_HOST, createShipperServiceClient } from "./gen";
 const baseUrl = `https://${DEFAULT_HOST}`;
 ```
 
+## additional_bindings 支持
+
+`google.api.http` 的 `additional_bindings` 会为每个附加绑定生成一个独立成员，命名为 `<Method>Alt<N>`（N 从 1 开始，按注解中的声明顺序编号），接口声明与客户端实现同步生成：
+
+```protobuf
+rpc CreateBook(CreateBookRequest) returns (Book) {
+  option (google.api.http) = {
+    post: "/v1/{parent=publishers/*}/books"
+    body: "book"
+    additional_bindings {
+      post: "/v1/books"
+      body: "book"
+    }
+    additional_bindings {
+      get: "/v1/books/{isbn}"
+    }
+  };
+}
+```
+
+```typescript
+// 生成的代码（每个绑定独立推导路径校验、body 选择与 query 参数）
+interface BookService {
+  CreateBook(request: CreateBookRequest): Promise<Book>;     // POST /v1/{parent}/books
+  CreateBookAlt1(request: CreateBookRequest): Promise<Book>; // POST /v1/books
+  CreateBookAlt2(request: CreateBookRequest): Promise<Book>; // GET /v1/books/{isbn}
+}
+```
+
+说明：
+
+- 每个变体的注释标注其 HTTP 方法与路由模板
+- 路径校验按各自绑定独立生效（如上例只有 `CreateBookAlt2` 要求 `isbn` 非空）
+- 流式 RPC 仅支持主绑定，附加绑定会被跳过并输出警告
+
 ## 流式通信
 
 服务端流式 RPC（`returns (stream ...)`）和双向流式 RPC（`stream ... returns (stream ...)`）分别通过 `ClientTransport` 的 `serverStream()` 和 `duplexStream()` 方法支持。

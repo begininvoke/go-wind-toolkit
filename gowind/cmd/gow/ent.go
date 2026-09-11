@@ -6,10 +6,15 @@ import (
 )
 
 var entCmd = &cobra.Command{
-	Use:   "ent <service>",
+	Use:   "ent [service] | ent generate <service> | ent add <service> <schemas>",
 	Short: "manage ent schemas",
-	Long:  "Manage ent schemas for services. Examples: gow ent generate admin  or  gow ent add admin User,Group",
-	RunE:  ent.RunGenerate,
+	Long: `Manage ent schemas for services.
+
+  gow ent admin                 generate ent code for service admin
+  gow ent generate admin        same as above (explicit subcommand)
+  gow ent admin1 admin2         generate for multiple services
+  gow ent add admin User,Group  add schema(s) to a service, then regenerate`,
+	RunE: ent.RunGenerate,
 }
 
 var entGenerateCmd = &cobra.Command{
@@ -27,6 +32,6 @@ var entAddCmd = &cobra.Command{
 }
 
 func init() {
-	//entCmd.AddCommand(entGenerateCmd, entAddCmd)
+	entCmd.AddCommand(entGenerateCmd, entAddCmd)
 	rootCmd.AddCommand(entCmd)
 }

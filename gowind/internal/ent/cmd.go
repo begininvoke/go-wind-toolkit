@@ -131,6 +131,12 @@ func generateEnt(serviceRootPath string) error {
 	)
 }
 
+// GenerateService 为指定服务执行 ent code generation，供其他命令（如 migrate）
+// 在缺少 ent/migrate 包时自动补齐。要求服务目录下存在 internal/data/ent/schema。
+func GenerateService(serviceRootPath string) error {
+	return generateEnt(serviceRootPath)
+}
+
 func RunAdd(cmd *cobra.Command, args []string) error {
 	// 最少需要 service 和 schemas
 	if len(args) < 2 {
@@ -173,8 +179,21 @@ func RunAdd(cmd *cobra.Command, args []string) error {
 	}
 
 	servicePath := filepath.Join(inspector.Root, "app", service, "service")
+	// `ent new` 在工作目录下创建 ent/schema/ 子目录,
+	// 因此工作目录取 internal/data,最终落点为 internal/data/ent/schema/。
 	target := filepath.Join(servicePath, "internal", "data")
 
 	e := NewEntCmd(target)
-	return e.RunNew(names)
+	if err = e.RunNew(names); err != nil {
+		return err
+	}
+
+	// 新增 schema 后立即重新生成 ent 运行时,保证代码可直接编译使用。
+	if err = generateEnt(servicePath); err != nil {
+		return fmt.Errorf("regenerate ent code: %w", err)
+	}
+
+	fmt.Printf("Added schema(s) [%s] to service [%s]; ent code regenerated.\n",
+		strings.Join(filtered, ", "), service)
+	return nil
 }

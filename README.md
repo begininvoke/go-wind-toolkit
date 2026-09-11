@@ -101,6 +101,9 @@ gow add service admin -s rest -s grpc
 
 # 指定 ORM（gorm / ent）
 gow add service admin -d gorm -s grpc
+
+# 预览将创建的服务布局，不做任何变更
+gow add service admin -s grpc --dry-run
 ```
 
 ### 运行服务
@@ -111,13 +114,74 @@ gow run
 
 # 指定服务名运行
 gow run admin
+
+# 不指定服务名时运行模块内全部服务
+gow run
 ```
+
+### 热重载运行（--watch）
+
+```shell
+# watch 模式:保存文件自动重建并重启受影响的服务
+gow run admin --watch
+
+# 全部服务一起 watch(输出按服务名加前缀)
+gow run --watch
+
+# 也可在服务目录下运行
+cd app/admin/service && gow run -w
+```
+
+watch 模式说明：
+
+- 递归监听模块根目录（跳过 `.git`、`vendor`、`node_modules`、`bin`、隐藏目录等），`.go`/`.yaml`/`.yml`/`.json`/`.toml`/`.properties`/`.proto` 变更触发重建重启，`*_test.go` 与隐藏文件忽略
+- 只重建重启**受影响的服务**：变更位于某服务目录内只重启该服务；模块级共享代码变更重启全部
+- 500ms 防抖合并连续保存；**编译失败保持旧进程运行**，修复后下次保存自动重试
+- 停止时先 SIGTERM 优雅退出（5s 宽限后强杀）；`.proto` 变更只触发重启，需先 `gow api` 重新生成
+
+### 编译服务
+
+```shell
+# 编译全部服务到各服务 bin/ 目录
+gow build
+
+# 编译指定服务
+gow build admin user
+
+# 交叉编译(GOOS×GOARCH 全组合,产物带 _<goos>_<goarch> 后缀)
+gow build --os linux,windows --arch amd64,arm64
+
+# 注入版本号并产出精简二进制
+gow build --version v1.2.3 --strip --trimpath
+
+# 自定义 ldflags 与输出目录
+gow build -o ./dist --ldflags "-X main.commit=$(git rev-parse --short HEAD)"
+```
+
+`--version` 通过 `-ldflags "-X main.version=..."` 注入到各服务 `main` 包的 `version` 变量（脚手架模板默认生成该变量）。
+
+### 查看版本
+
+```shell
+gow version
+
+# 发布构建时通过 ldflags 注入(发布流程已内置):
+# go build -ldflags "-X main.version=v1.2.3 -X main.commit=abc1234 -X main.date=..."
+gow version
+# gow version v1.2.3 (commit: abc1234, built: 2026-09-12T08:00:00Z)
+```
+
+`go install` 安装时自动回落显示模块版本；本地源码构建显示 `dev`。
 
 ### 从数据库生成 CRUD 代码
 
 ```shell
 # 交互式（提示输入 DSN 和服务名）
 gow generate
+
+# 校验数据源、解析表清单并预览计划，不写入任何文件
+# （支持数据库 DSN 或内联 DDL 文本）
+gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user --dry-run
 
 # 完整命令行
 gow generate --dsn "mysql://user:pass@tcp(localhost:3306)/dbname" --service user
@@ -142,6 +206,12 @@ gow ent
 
 # 为指定服务生成
 gow ent admin
+
+# 显式子命令形式（等价）
+gow ent generate admin
+
+# 为服务新增 schema 并自动重新生成 Ent 代码
+gow ent add admin Role,Permission
 ```
 
 ### Wire 依赖注入生成
@@ -161,6 +231,24 @@ gow wire admin
 gow api
 ```
 
+### ent schema 逆向导出 DDL（migrate）
+
+```shell
+# 为所有含 ent schema 的服务导出 DDL(默认 mysql 方言)
+gow migrate
+
+# 指定服务与方言(mysql / postgres / sqlite)
+gow migrate admin --dialect postgres
+
+# 集中输出到单目录(文件名为 <service>.<dialect>.sql)
+gow migrate --dialect sqlite -o ./dist/sql
+
+# 指定数据库版本以生成方言特定语法
+gow migrate admin --dialect mysql --db-version 5.7
+```
+
+`gow migrate` 把 `app/<服务>/service/internal/data/ent` 的 ent schema 逆向为 `CREATE TABLE` 脚本（通过 ent 的 `schema.DDL` 离线规划，**无需连接数据库**），默认写入各服务的 `migrations/schema.<方言>.sql`。缺失的 ent 代码生成会自动补齐（同 `gow ent`）；非 ent（gorm）服务自动跳过。产物可直接作为 Atlas 基线迁移或用于审查 schema 状态。
+
 ### 微服务演进（模块提取）
 
 ```shell
@@ -174,22 +262,26 @@ gow extract admin user -o role,permission
 # 手动指定 ORM 类型
 gow extract admin user -o role --orm gorm
 
+# 预览全部文件动作（复制/修改/删除），不做任何变更
+gow extract admin user -o role --dry-run
+
 # 保留源文件（默认删除）
 gow extract admin user -o role --keep-source
+
+# 脚本/CI 场景跳过删除确认
+gow extract admin user -o role --yes
 ```
 
-### 查看版本
-
-```shell
-gow version
-```
+提取**默认删除源端文件**，因此：执行前会先打印完整计划（复制、就地修改、删除清单），删除前要求交互确认（默认拒绝）；`--dry-run` 只预览零变更，`--keep-source` 非破坏性免确认，`--yes` 供脚本跳过确认。
 
 ## 特性总结
 
 - 一键创建 Kratos 标准项目
 - 一键添加多协议微服务（gRPC + REST）
+- 服务热重载运行与交叉编译（`gow run --watch` / `gow build`）
 - 数据库驱动 CRUD 代码生成（proto、ORM、service、server、wire、config）
 - 自动生成 Ent / GORM 模型
+- ent schema 逆向导出 DDL（`gow migrate`，离线、免连库）
 - 自动生成 Protobuf & API 定义
 - 自动生成 Wire 依赖注入
 - 微服务渐进式拆分与演进（模块提取）

@@ -169,7 +169,12 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 				_, _ = fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: %s %s body should not be declared.\n", method, path)
 			}
 		} else {
-			if body == "" {
+			// An undeclared body is only a silent-degradation bug when request fields
+			// exist that no path variable binds — those fall back to query parameters.
+			// When every field is path-bound (or the request has none), the empty body
+			// is the intended contract: opaque-payload endpoints keep the body out of
+			// proto binding entirely and consume it as raw bytes.
+			if body == "" && !allFieldsPathBound(inputFieldNames(m), path) {
 				_, _ = fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: %s %s does not declare a body.\n", method, path)
 			}
 		}
@@ -306,6 +311,32 @@ func buildPathVars(path string) (res map[string]*string) {
 		}
 	}
 	return
+}
+
+// inputFieldNames lists the top-level field names of a method's request message.
+func inputFieldNames(m *protogen.Method) []string {
+	fields := m.Input.Desc.Fields()
+	names := make([]string, 0, fields.Len())
+	for i := 0; i < fields.Len(); i++ {
+		names = append(names, string(fields.Get(i).Name()))
+	}
+	return names
+}
+
+// allFieldsPathBound reports whether every listed request field is consumed by a
+// path variable of this pattern. A field list with no entries is vacuously bound:
+// with nothing left that could fall back from body to query binding, an undeclared
+// body is a legitimate contract rather than a degradation bug. Dotted path
+// variables (e.g. "{foo.bar}") deliberately bind no top-level field name, so
+// nested bindings stay on the warning side of the check.
+func allFieldsPathBound(fieldNames []string, path string) bool {
+	vars := buildPathVars(path)
+	for _, name := range fieldNames {
+		if _, ok := vars[name]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func replacePath(name string, value string, path string) string {

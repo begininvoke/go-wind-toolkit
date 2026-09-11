@@ -268,3 +268,18 @@ func TestHTTPTemplateResponseBody(t *testing.T) {
 		t.Fatalf("generated template should write response body field:\n%s", got)
 	}
 }
+
+func TestAllFieldsPathBound(t *testing.T) {
+	if !allFieldsPathBound([]string{"source", "key"}, "/open/v1/webhooks/{source}/{key}") {
+		t.Fatal("fields fully consumed by path variables must be reported as bound")
+	}
+	if !allFieldsPathBound(nil, "/test/noparams") {
+		t.Fatal("a request with no fields is vacuously bound")
+	}
+	if allFieldsPathBound([]string{"source", "filter"}, "/open/v1/webhooks/{source}/{key}") {
+		t.Fatal("a field no path variable binds must not be reported as bound")
+	}
+	if allFieldsPathBound([]string{"foo"}, "/test/{foo.bar}") {
+		t.Fatal("a dotted path variable must not count as binding a top-level field")
+	}
+}

@@ -326,6 +326,39 @@ service FreightService {
 const defaultHost = 'freight-example.einride.tech';
 ```
 
+## additional_bindings 支持
+
+`google.api.http` 的 `additional_bindings` 会为每个附加绑定生成一个独立方法，命名为 `<方法名>Alt<N>`（N 从 1 开始，按注解中的声明顺序编号）：
+
+```protobuf
+rpc CreateBook(CreateBookRequest) returns (Book) {
+  option (google.api.http) = {
+    post: "/v1/{parent=publishers/*}/books"
+    body: "book"
+    additional_bindings {
+      post: "/v1/books"
+      body: "book"
+    }
+    additional_bindings {
+      get: "/v1/books/{isbn}"
+    }
+  };
+}
+```
+
+```dart
+// 生成的代码（每个绑定独立推导路径校验、body 选择与 query 参数）
+Future<Book> createBook(CreateBookRequest request, {Map<String, String>? headers});     // POST /v1/{parent}/books
+Future<Book> createBookAlt1(CreateBookRequest request, {Map<String, String>? headers}); // POST /v1/books
+Future<Book> createBookAlt2(CreateBookRequest request, {Map<String, String>? headers}); // GET /v1/books/{isbn}
+```
+
+说明：
+
+- 每个变体的文档注释标注其 HTTP 方法与路由模板
+- 路径校验按各自绑定独立生效（如上例只有 `createBookAlt2` 要求 `isbn` 非空）
+- 流式 RPC 仅支持主绑定，附加绑定会被跳过并输出警告
+
 ## Well-known 类型映射
 
 | Proto 类型                      | Dart 类型                | JSON 格式                              |

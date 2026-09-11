@@ -64,13 +64,43 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	}
 	if isStreamingMethod(method) {
 		generateStreamClientMethod(f, s.pkg, method, rule)
+		for i := range rule.AdditionalRules {
+			Warn("method %s.%s: streaming additional binding %d skipped (streaming methods support the primary binding only)", s.service.FullName(), method.Name(), i+1)
+		}
 		return nil
 	}
 
-	commentGenerator{descriptor: method}.generateLeading(f, 1)
+	// 每个 additional_bindings 条目生成一个 <method>Alt<N> 变体方法。
+	baseName := lowerCamel(string(method.Name()))
+	if err := s.generateUnaryMethod(f, method, rule, baseName, 0); err != nil {
+		return err
+	}
+	for i, additional := range rule.AdditionalRules {
+		f.P()
+		if err := s.generateUnaryMethod(f, method, additional, fmt.Sprintf("%sAlt%d", baseName, i+1), i+1); err != nil {
+			return fmt.Errorf("generate additional binding %d: %w", i+1, err)
+		}
+	}
+	return nil
+}
+
+// generateUnaryMethod 为一个 HTTP 绑定生成一个 Dart 客户端方法。
+// bindingIndex 0 为注解里的主绑定;>0 表示 additional_bindings 变体,
+// 文档注释标注其路由。
+func (s serviceGenerator) generateUnaryMethod(
+	f *codegen.File,
+	method protoreflect.MethodDescriptor,
+	rule httprule.Rule,
+	dartMethodName string,
+	bindingIndex int,
+) error {
+	if bindingIndex == 0 {
+		commentGenerator{descriptor: method}.generateLeading(f, 1)
+	} else {
+		f.P(t(1), "/// Alternate HTTP binding #", bindingIndex, " of ", lowerCamel(string(method.Name())), ": ", rule.Method, " ", templatePathString(rule))
+	}
 	outputType := typeFromMessage(s.pkg, method.Output())
 	inputType := typeFromMessage(s.pkg, method.Input())
-	dartMethodName := lowerCamel(string(method.Name()))
 
 	usesRequest := methodUsesRequest(rule, method.Input())
 	paramName := "request"
@@ -98,6 +128,29 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	f.P(t(2), "return ", returnTypeExpr(outputType, method.Output()), ";")
 	f.P(t(1), "}")
 	return nil
+}
+
+// templatePathString renders a binding's URL template for documentation
+// comments, with {field.path} placeholders for path variables.
+func templatePathString(rule httprule.Rule) string {
+	parts := make([]string, 0, len(rule.Template.Segments))
+	for _, seg := range rule.Template.Segments {
+		switch seg.Kind {
+		case httprule.SegmentKindVariable:
+			parts = append(parts, "{"+seg.Variable.FieldPath.String()+"}")
+		case httprule.SegmentKindLiteral:
+			parts = append(parts, seg.Literal)
+		case httprule.SegmentKindMatchSingle:
+			parts = append(parts, "*")
+		case httprule.SegmentKindMatchMultiple:
+			parts = append(parts, "**")
+		}
+	}
+	path := "/" + strings.Join(parts, "/")
+	if rule.Template.Verb != "" {
+		path += ":" + rule.Template.Verb
+	}
+	return path
 }
 
 // returnTypeExpr generates the expression to convert a transport result to the output type.

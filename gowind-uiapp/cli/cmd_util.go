@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -36,8 +36,13 @@ func stringSliceFlag(cmd *cobra.Command, name string) []string {
 // checkErr 参数校验失败（用法错误，退出码 2）
 func checkErr(err error) {
 	fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-	fmt.Fprintf(os.Stderr, "运行 gowind-cli <命令> --help 查看用法\n")
+	fmt.Fprintf(os.Stderr, "运行 gowind-uiapp <命令> --help 查看用法\n")
 	os.Exit(2)
+}
+
+// logf 输出日志到 stderr
+func logf(format string, args ...any) {
+	fmt.Fprintf(os.Stderr, format+"\n", args...)
 }
 
 // readFileContent 读取文件内容

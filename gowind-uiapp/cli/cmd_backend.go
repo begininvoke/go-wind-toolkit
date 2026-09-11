@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"context"
@@ -150,11 +150,11 @@ var backendGrpcCmd = &cobra.Command{
 		}
 
 		emit(map[string]any{
-			"success":   true,
-			"root":      rootPath,
-			"orm":       ormType,
+			"success":     true,
+			"root":        rootPath,
+			"orm":         ormType,
 			"postprocess": !boolFlag(cmd, "skip-postprocess"),
-			"services":  serviceNames(opts),
+			"services":    serviceNames(opts),
 		})
 	},
 }

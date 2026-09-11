@@ -1,7 +1,8 @@
-package main
+package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -102,6 +103,9 @@ var dbTestCmd = &cobra.Command{
 			fail(err)
 		}
 		emit(result)
+		if !result.Success {
+			os.Exit(1)
+		}
 	},
 }
 

@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -44,13 +44,13 @@ vue-vben 的国际化产物是合并式片段: 目标 locales/langs/{lang}/page.
 		}
 
 		opts := frontendgen.Options{
-			Spec:            spec,
-			Framework:       framework,
-			ServiceName:     flagString(cmd, "service-name", "admin"),
-			ModulePathMap:   parseModulePathMap(cmd),
-			GenerateTypes:   stringSliceFlag(cmd, "types"),
-			Tags:            stringSliceFlag(cmd, "tags"),
-			RouterModules:   parseRouterModules(cmd),
+			Spec:              spec,
+			Framework:         framework,
+			ServiceName:       flagString(cmd, "service-name", "admin"),
+			ModulePathMap:     parseModulePathMap(cmd),
+			GenerateTypes:     stringSliceFlag(cmd, "types"),
+			Tags:              stringSliceFlag(cmd, "tags"),
+			RouterModules:     parseRouterModules(cmd),
 			AutoRouterModules: true,
 		}
 

@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"fmt"
@@ -37,7 +37,8 @@ var configExportCmd = &cobra.Command{
 	Use:   "export",
 	Short: "导出服务配置到配置中心",
 	Long: `将 app/<服务>/service/configs 下的配置文件导出到远程配置中心。
-指定 --service 时只导出该服务，否则导出全部服务。Etcd 暂未实现。`,
+指定 --service 时只导出该服务，否则导出全部服务。
+Etcd endpoint 支持 host:port 或 http(s)://host:port，逗号分隔多节点。`,
 	Run: func(cmd *cobra.Command, args []string) {
 		typeName := flagString(cmd, "type", "")
 		endpoint := flagString(cmd, "endpoint", "")

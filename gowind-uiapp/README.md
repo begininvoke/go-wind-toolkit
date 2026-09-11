@@ -24,6 +24,12 @@ GoWind Toolkit 是一个基于 Go + Wails + Vue3 + Ant Design 的桌面端可视
 - 前端：Vue 3、TypeScript、Vite、Ant Design Vue、Monaco Editor
 - 依赖管理：Go Modules、pnpm/npm
 
+## 命令行模式
+
+同一可执行文件支持双模式：**不带参数**启动图形界面；**带命令行参数**进入无头 CLI 模式（项目探测、数据库、后端/前端代码生成、AI 助手、配置中心导出，JSON 输出、零交互，适合脚本与 AI Agent）。详见 [docs/cli.md](docs/cli.md)。
+
+项目脚手架与开发工具（创建项目、添加服务、buf/ent/wire 生成）请使用 `gow` CLI，两者共享同一套生成库。
+
 ## 目录结构说明
 
 ```
@@ -43,7 +49,7 @@ gowind-uiapp/
 │   │   └── assets/       # 静态资源
 │   ├── package.json      # 前端依赖与脚本
 │   └── ...
-├── cmd/gowind-cli/       # 命令行入口（非交互、JSON 输出，供 AI/脚本调用，见 docs/cli.md）
+├── cli/                  # 命令行模式（gowind-uiapp 带参数启动，非交互 JSON 输出，见 docs/cli.md）
 ├── docs/                 # 文档（cli.md 等）
 ├── build/                # 构建相关资源与平台适配
 └── README.md             # 项目说明文档

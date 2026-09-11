@@ -1,7 +1,8 @@
-package main
+package cli
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -23,25 +24,35 @@ func addAIFlags(cmd *cobra.Command) {
 	cmd.Flags().Int("max-tokens", 0, "最大 token 数")
 }
 
-// buildAIService 从 flag/环境变量构建 AI 服务
+// buildAIService 构建 AI 服务:持久化配置为底(GUI 里配置一次即生效),
+// 环境变量 GOWIND_AI_* 覆盖,命令行旗标最高优先级。不回写配置文件。
 func buildAIService(cmd *cobra.Command) *ai.Service {
-	cfg := &ai.Config{
-		Provider:    flagString(cmd, "provider", envOr("GOWIND_AI_PROVIDER", "openai")),
-		BaseURL:     flagString(cmd, "base-url", envOr("GOWIND_AI_BASE_URL", "")),
-		APIKey:      flagString(cmd, "api-key", envOr("GOWIND_AI_API_KEY", "")),
-		Model:       flagString(cmd, "model", envOr("GOWIND_AI_MODEL", "")),
-		Temperature: 0.7,
-		MaxTokens:   0,
+	cfg := ai.LoadConfig()
+	if v := flagString(cmd, "provider", envOr("GOWIND_AI_PROVIDER", "")); v != "" {
+		cfg.Provider = v
 	}
-	if t, err := cmd.Flags().GetFloat64("temperature"); err == nil && t > 0 {
-		cfg.Temperature = t
+	if v := flagString(cmd, "base-url", envOr("GOWIND_AI_BASE_URL", "")); v != "" {
+		cfg.BaseURL = v
 	}
-	if m, err := cmd.Flags().GetInt("max-tokens"); err == nil && m > 0 {
-		cfg.MaxTokens = m
+	if v := flagString(cmd, "api-key", envOr("GOWIND_AI_API_KEY", "")); v != "" {
+		cfg.APIKey = v
+	}
+	if v := flagString(cmd, "model", envOr("GOWIND_AI_MODEL", "")); v != "" {
+		cfg.Model = v
+	}
+	if cmd.Flags().Changed("temperature") {
+		if t, err := cmd.Flags().GetFloat64("temperature"); err == nil && t > 0 {
+			cfg.Temperature = t
+		}
+	}
+	if cmd.Flags().Changed("max-tokens") {
+		if m, err := cmd.Flags().GetInt("max-tokens"); err == nil && m > 0 {
+			cfg.MaxTokens = m
+		}
 	}
 
 	svc := ai.NewService()
-	svc.SetConfig(cfg)
+	svc.SetConfigTransient(cfg)
 	return svc
 }
 
@@ -78,7 +89,16 @@ var aiDdlCmd = &cobra.Command{
 			checkErr(err)
 		}
 
-		result, err := buildAIService(cmd).GenerateDDL(requirements)
+		svc := buildAIService(cmd)
+		var result *ai.StepResult
+		if boolFlag(cmd, "stream") {
+			// 增量内容实时写 stderr,完整结果仍输出 stdout JSON。
+			result, err = svc.GenerateDDLStream(requirements, func(delta string) {
+				fmt.Fprint(os.Stderr, delta)
+			})
+		} else {
+			result, err = svc.GenerateDDL(requirements)
+		}
 		if err != nil {
 			fail(err)
 		}
@@ -125,7 +145,16 @@ var aiReviewCmd = &cobra.Command{
 			contents[shortPath(path)] = content
 		}
 
-		result, err := buildAIService(cmd).ReviewCode(contents)
+		svc := buildAIService(cmd)
+		var result *ai.StepResult
+		var err error
+		if boolFlag(cmd, "stream") {
+			result, err = svc.ReviewCodeStream(contents, func(delta string) {
+				fmt.Fprint(os.Stderr, delta)
+			})
+		} else {
+			result, err = svc.ReviewCode(contents)
+		}
 		if err != nil {
 			fail(err)
 		}
@@ -147,8 +176,10 @@ func init() {
 	addAIFlags(aiPartitionCmd)
 	addAIFlags(aiReviewCmd)
 	aiDdlCmd.Flags().String("requirements", "", "需求文档文件路径（必填）")
+	aiDdlCmd.Flags().Bool("stream", false, "流式生成（增量内容实时输出到 stderr，完整结果仍输出 stdout JSON）")
 	aiPartitionCmd.Flags().String("ddl", "", "DDL 文件路径（必填）")
 	aiReviewCmd.Flags().StringSlice("files", nil, "要审查的文件路径（逗号分隔，必填）")
+	aiReviewCmd.Flags().Bool("stream", false, "流式审查（增量内容实时输出到 stderr，完整结果仍输出 stdout JSON）")
 
 	aiCmd.AddCommand(aiPresetsCmd, aiTestCmd, aiDdlCmd, aiPartitionCmd, aiReviewCmd)
 }

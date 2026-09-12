@@ -96,42 +96,44 @@ func defaultPort(dbType string) int {
 var dbTestCmd = &cobra.Command{
 	Use:   "test",
 	Short: "测试数据库连接",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := buildDBConfig(cmd)
 		result, err := database.TestConnection(cfg)
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(result)
 		if !result.Success {
 			os.Exit(1)
 		}
+		return nil
 	},
 }
 
 var dbTablesCmd = &cobra.Command{
 	Use:   "tables",
 	Short: "列出数据库全部表",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg := buildDBConfig(cmd)
 		conn, err := database.Connect(cfg)
 		if err != nil {
-			fail(err)
+			return err
 		}
 		defer conn.Close()
 
 		tables, err := database.GetTables(conn, cfg.Type)
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(tables)
+		return nil
 	},
 }
 
 var dbColumnsCmd = &cobra.Command{
 	Use:   "columns",
 	Short: "列出指定表的列信息",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		table := flagString(cmd, "table", "")
 		if table == "" {
 			checkErr(fmt.Errorf("必须指定 --table"))
@@ -139,15 +141,16 @@ var dbColumnsCmd = &cobra.Command{
 		cfg := buildDBConfig(cmd)
 		conn, err := database.Connect(cfg)
 		if err != nil {
-			fail(err)
+			return err
 		}
 		defer conn.Close()
 
 		columns, err := database.GetColumns(conn, cfg.Type, table)
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(columns)
+		return nil
 	},
 }
 

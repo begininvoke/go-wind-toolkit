@@ -26,7 +26,7 @@ var frontendGenCmd = &cobra.Command{
 
 vue-vben 的国际化产物是合并式片段: 目标 locales/langs/{lang}/page.json（menu.json）存在时按键合并写回，
 不存在时新建独立片段文件。`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		openapiRef := flagString(cmd, "openapi", "")
 		if openapiRef == "" {
 			checkErr(fmt.Errorf("必须指定 --openapi（OpenAPI YAML 文件路径或 http(s) URL）"))
@@ -40,7 +40,7 @@ vue-vben 的国际化产物是合并式片段: 目标 locales/langs/{lang}/page.
 
 		spec, err := loadOpenAPISpec(openapiRef)
 		if err != nil {
-			fail(err)
+			return err
 		}
 
 		opts := frontendgen.Options{
@@ -56,7 +56,7 @@ vue-vben 的国际化产物是合并式片段: 目标 locales/langs/{lang}/page.
 
 		files, err := frontendgen.Generate(opts)
 		if err != nil {
-			fail(err)
+			return err
 		}
 
 		switch {
@@ -81,10 +81,11 @@ vue-vben 的国际化产物是合并式片段: 目标 locales/langs/{lang}/page.
 			}
 			results, err := frontendgen.WriteFiles(files, outDir)
 			if err != nil {
-				fail(err)
+				return err
 			}
 			emit(map[string]any{"results": results, "count": len(results)})
 		}
+		return nil
 	},
 }
 

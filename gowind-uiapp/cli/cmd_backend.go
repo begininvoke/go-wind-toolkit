@@ -130,7 +130,7 @@ var backendGrpcCmd = &cobra.Command{
 	Long: `按表到服务的映射生成 gRPC 微服务全栈代码: proto、ORM、data、service、server、main、config、Makefile。
 生成后自动执行后处理链: go mod tidy -> buf generate -> ent generate (ent ORM 时) -> wire。
 与 GUI 的 gRPC 代码生成完全同源。`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		dbConfig, opts := buildBackendInputs(cmd)
 		rootPath, projectName := resolveProjectRoot(cmd)
 
@@ -146,7 +146,7 @@ var backendGrpcCmd = &cobra.Command{
 		logf("开始生成 gRPC 代码 (orm=%s, strategy=%s)...", ormType, strategy)
 
 		if err := g.GenerateGrpcCode(context.Background(), dbConfig, ormType, strategy, rootPath, projectName); err != nil {
-			fail(err)
+			return err
 		}
 
 		emit(map[string]any{
@@ -156,13 +156,14 @@ var backendGrpcCmd = &cobra.Command{
 			"postprocess": !boolFlag(cmd, "skip-postprocess"),
 			"services":    serviceNames(opts),
 		})
+		return nil
 	},
 }
 
 var backendRestCmd = &cobra.Command{
 	Use:   "rest",
 	Short: "生成 REST 网关服务代码（不生成 ORM/data/repo，无后处理）",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		dbConfig, opts := buildBackendInputs(cmd)
 		rootPath, projectName := resolveProjectRoot(cmd)
 
@@ -180,7 +181,7 @@ var backendRestCmd = &cobra.Command{
 		logf("开始生成 REST 服务 %s 代码...", restServiceName)
 
 		if err := g.GenerateRestCode(context.Background(), restServiceName, "", strategy, dbConfig, rootPath, projectName); err != nil {
-			fail(err)
+			return err
 		}
 
 		emit(map[string]any{
@@ -189,6 +190,7 @@ var backendRestCmd = &cobra.Command{
 			"serviceName": restServiceName,
 			"services":    serviceNames(opts),
 		})
+		return nil
 	},
 }
 

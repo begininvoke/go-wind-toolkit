@@ -25,12 +25,13 @@ var configTypesCmd = &cobra.Command{
 var configServicesCmd = &cobra.Command{
 	Use:   "services",
 	Short: "扫描项目中有配置文件的服务",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		services, err := ce.GetServiceList(flagString(cmd, "path", "."))
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(services)
+		return nil
 	},
 }
 
@@ -40,7 +41,7 @@ var configExportCmd = &cobra.Command{
 	Long: `将 app/<服务>/service/configs 下的配置文件导出到远程配置中心。
 指定 --service 时只导出该服务，否则导出全部服务。
 Etcd endpoint 支持 host:port 或 http(s)://host:port，逗号分隔多节点。`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		typeName := flagString(cmd, "type", "")
 		endpoint := flagString(cmd, "endpoint", "")
 		projectName := flagString(cmd, "project", "")
@@ -62,21 +63,21 @@ Etcd endpoint 支持 host:port 或 http(s)://host:port，逗号分隔多节点�
 		if p := flagString(cmd, "ca-cert", ""); p != "" {
 			data, err := os.ReadFile(p)
 			if err != nil {
-				fail(fmt.Errorf("读取 ca-cert 失败: %w", err))
+				return fmt.Errorf("读取 ca-cert 失败: %w", err)
 			}
 			rc.CaCertPem = string(data)
 		}
 		if p := flagString(cmd, "client-cert", ""); p != "" {
 			data, err := os.ReadFile(p)
 			if err != nil {
-				fail(fmt.Errorf("读取 client-cert 失败: %w", err))
+				return fmt.Errorf("读取 client-cert 失败: %w", err)
 			}
 			rc.ClientCertPem = string(data)
 		}
 		if p := flagString(cmd, "client-key", ""); p != "" {
 			data, err := os.ReadFile(p)
 			if err != nil {
-				fail(fmt.Errorf("读取 client-key 失败: %w", err))
+				return fmt.Errorf("读取 client-key 失败: %w", err)
 			}
 			rc.ClientKeyPem = string(data)
 		}
@@ -90,7 +91,7 @@ Etcd endpoint 支持 host:port 或 http(s)://host:port，逗号分隔多节点�
 		if boolFlag(cmd, "dry-run") {
 			services, err := ce.GetServiceList(projectRoot)
 			if err != nil {
-				fail(err)
+				return err
 			}
 			emit(map[string]any{
 				"dryRun":   true,
@@ -99,21 +100,22 @@ Etcd endpoint 支持 host:port 或 http(s)://host:port，逗号分隔多节点�
 				"project":  projectName,
 				"services": services,
 			})
-			return
+			return nil
 		}
 
 		if serviceName != "" {
 			if err := ce.ExportOne(&rc, projectRoot, serviceName); err != nil {
-				fail(err)
+				return err
 			}
 			emit(map[string]any{"success": true, "service": serviceName})
-			return
+			return nil
 		}
 
 		if err := ce.ExportAll(&rc, projectRoot); err != nil {
-			fail(err)
+			return err
 		}
 		emit(map[string]any{"success": true, "all": true})
+		return nil
 	},
 }
 

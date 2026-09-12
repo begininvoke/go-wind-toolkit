@@ -14,13 +14,14 @@ var projectCmd = &cobra.Command{
 var projectInspectCmd = &cobra.Command{
 	Use:   "inspect",
 	Short: "探测项目信息（模块路径、服务列表、API 目录）",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		path := flagString(cmd, "path", ".")
 		info, err := detect.NewProjectDetector().Detect(path)
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(info)
+		return nil
 	},
 }
 

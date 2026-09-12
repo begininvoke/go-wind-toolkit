@@ -71,19 +71,20 @@ var aiPresetsCmd = &cobra.Command{
 var aiTestCmd = &cobra.Command{
 	Use:   "test",
 	Short: "测试 AI 连通性",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		result, err := buildAIService(cmd).TestConnection()
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(result)
+		return nil
 	},
 }
 
 var aiDdlCmd = &cobra.Command{
 	Use:   "ddl",
 	Short: "根据需求文档生成 MySQL DDL",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		reqFile := flagString(cmd, "requirements", "")
 		if reqFile == "" {
 			checkErr(fmt.Errorf("必须指定 --requirements（需求文档 Markdown/文本文件）"))
@@ -104,16 +105,17 @@ var aiDdlCmd = &cobra.Command{
 			result, err = svc.GenerateDDL(requirements)
 		}
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(result)
+		return nil
 	},
 }
 
 var aiPartitionCmd = &cobra.Command{
 	Use:   "partition",
 	Short: "根据 DDL 建议微服务划分",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ddlFile := flagString(cmd, "ddl", "")
 		if ddlFile == "" {
 			checkErr(fmt.Errorf("必须指定 --ddl（DDL 文件）"))
@@ -125,16 +127,17 @@ var aiPartitionCmd = &cobra.Command{
 
 		partitions, err := buildAIService(cmd).PartitionMicroservices(ddl)
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(partitions)
+		return nil
 	},
 }
 
 var aiReviewCmd = &cobra.Command{
 	Use:   "review",
 	Short: "AI 代码审查（Go/微服务/Kratos 维度）",
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		files := stringSliceFlag(cmd, "files")
 		if len(files) == 0 {
 			checkErr(fmt.Errorf("必须指定 --files（逗号分隔的文件路径）"))
@@ -160,9 +163,10 @@ var aiReviewCmd = &cobra.Command{
 			result, err = svc.ReviewCode(contents)
 		}
 		if err != nil {
-			fail(err)
+			return err
 		}
 		emit(result)
+		return nil
 	},
 }
 

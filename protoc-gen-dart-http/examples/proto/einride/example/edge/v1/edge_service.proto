@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package einride.example.edge.v1;
+
+import "einride/example/edge/v1/edge.proto";
+import "google/api/annotations.proto";
+
+service EdgeService {
+  // Query route whose request mixes a scalar field (the only query parameter
+  // that should be emitted) with repeated-message and message-valued map
+  // fields that must be skipped.
+  rpc QueryWithMessageCollections(EdgeRequest) returns (EdgeRequest) {
+    option (google.api.http) = {get: "/v1/edge"};
+  }
+
+  // Star body with a path-bound field: the field arrives via the URL path and
+  // must be removed from the JSON body to avoid a binding conflict on the
+  // server's synthetic oneof.
+  rpc StarBodyWithPath(EdgeRequest) returns (EdgeRequest) {
+    option (google.api.http) = {
+      post: "/v1/edge/{scalar}:starBodyWithPath"
+      body: "*"
+    };
+  }
+
+  // Path literal and verb containing a dollar sign: Dart interpolates $ in
+  // every string form, so both must be escaped when emitted into the
+  // generated client, while the variable segment stays an interpolation.
+  rpc DollarLiteral(EdgeRequest) returns (EdgeRequest) {
+    option (google.api.http) = {get: "/v1/li$teral/{scalar}:dollar$verb"};
+  }
+}

@@ -73,12 +73,21 @@ func t(n int) string {
 	return strings.Repeat("  ", n)
 }
 
-// dartString wraps s in Dart single quotes, escaping backslashes and single
-// quotes as needed.
-func dartString(s string) string {
+// dartEscapeLiteral escapes a path literal for embedding inside a Dart string
+// literal: backslash, quote, and dollar. Dart performs $-interpolation in every
+// string form, so an unescaped $ from a path literal would either break the
+// generated code or silently interpolate an unrelated identifier.
+func dartEscapeLiteral(s string) string {
 	s = strings.ReplaceAll(s, "\\", "\\\\")
 	s = strings.ReplaceAll(s, "'", "\\'")
-	return "'" + s + "'"
+	s = strings.ReplaceAll(s, "$", "\\$")
+	return s
+}
+
+// dartString wraps s in Dart single quotes, escaping backslashes, single
+// quotes, and dollars as needed.
+func dartString(s string) string {
+	return "'" + dartEscapeLiteral(s) + "'"
 }
 
 // lowerCamel converts a PascalCase or UPPER_SNAKE_CASE name to lowerCamelCase.

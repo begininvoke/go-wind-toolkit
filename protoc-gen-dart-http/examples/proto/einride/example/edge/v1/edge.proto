@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package einride.example.edge.v1;
+
+// EdgeRequest mixes a scalar field with repeated-message and message-valued
+// map fields. The message collections cannot be meaningfully serialized as
+// query parameters, so query routes must skip them and keep only the scalar.
+message EdgeRequest {
+  string scalar = 1;
+  repeated Nested repeated_nested = 2;
+  map<string, Nested> nested_map = 3;
+}
+
+message Nested {
+  string string = 1;
+}

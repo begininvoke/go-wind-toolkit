@@ -192,7 +192,7 @@ func generateMethodPath(
 			fieldPath := dartAccessPath(seg.Variable.FieldPath, input)
 			pathParts = append(pathParts, "${request."+fieldPath+"}")
 		case httprule.SegmentKindLiteral:
-			pathParts = append(pathParts, seg.Literal)
+			pathParts = append(pathParts, dartEscapeLiteral(seg.Literal))
 		case httprule.SegmentKindMatchSingle:
 			pathParts = append(pathParts, "*")
 		case httprule.SegmentKindMatchMultiple:
@@ -201,9 +201,9 @@ func generateMethodPath(
 	}
 	path := "/" + strings.Join(pathParts, "/")
 	if rule.Template.Verb != "" {
-		path += ":" + rule.Template.Verb
+		path += ":" + dartEscapeLiteral(rule.Template.Verb)
 	}
-	f.P(t(2), "final path = ", dartString(path), ";")
+	f.P(t(2), "final path = '", path, "';")
 }
 
 func generateMethodBody(

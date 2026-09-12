@@ -4,7 +4,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/tx7do/go-wind-toolkit/protoc-gen-dart-http/internal/codegen"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

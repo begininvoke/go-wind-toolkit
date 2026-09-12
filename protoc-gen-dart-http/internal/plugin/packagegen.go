@@ -1,8 +1,8 @@
 package plugin
 
 import (
-	"github.com/tx7do/go-wind-toolkit/protoc-gen-dart-http/internal/codegen"
-	"github.com/tx7do/go-wind-toolkit/protoc-gen-dart-http/internal/protowalk"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/protowalk"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

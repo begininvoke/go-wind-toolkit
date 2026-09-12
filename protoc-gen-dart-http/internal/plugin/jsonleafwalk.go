@@ -1,7 +1,7 @@
 package plugin
 
 import (
-	"github.com/tx7do/go-wind-toolkit/protoc-gen-dart-http/internal/httprule"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

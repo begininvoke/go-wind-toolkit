@@ -56,7 +56,6 @@ type methodDesc struct {
 	Comment      string // 方法注释（含废弃标记），原样写入生成代码。 / Method comment (including deprecation), written verbatim into generated code. / メソッドコメント（非推奨表記を含む）。生成コードにそのまま出力される。
 	// ---- http_rule 信息 / http_rule info / http_rule 情報 ----
 	Path            string // 实际路由路径（路径变量已被规范化）。 / Actual route path (path variables normalized). / 実際のルートパス（パス変数は正規化済み）。
-	PathTemplate    string // 原始路由模板，保留路径变量占位符。 / Original route template, keeping path variable placeholders. / 元のルートテンプレート。パス変数のプレースホルダを保持。
 	PathVarsList    string // 路径变量名的 Go 切片字面量，例如 []string{"id", "user.name"}。 / Go slice literal of path variable names, e.g. []string{"id", "user.name"}. / パス変数名の Go スライスリテラル（例: []string{"id", "user.name"}）。
 	Method          string // HTTP 方法，例如 GET、POST。 / HTTP method, e.g. GET, POST. / HTTP メソッド（例: GET、POST）。
 	HasVars         bool   // 是否存在路径变量。 / Whether there are path variables. / パス変数が存在するかどうか。

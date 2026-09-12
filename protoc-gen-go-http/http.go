@@ -9,9 +9,9 @@ import (
 
 	"google.golang.org/protobuf/reflect/protoreflect"
 
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/compiler/protogen"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/descriptorpb"
 )
 
@@ -98,15 +98,15 @@ func genService(_ *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFi
 			}
 			// HttpBody 流式方法继续走注解处理，handler 按流式形态生成。
 		}
-		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
-		if rule != nil && ok {
+		rule, ok := httprule.Get(method.Desc)
+		if ok {
 			for _, bind := range rule.AdditionalBindings {
-				sd.Methods = append(sd.Methods, buildHTTPRule(g, service, method, bind, omitemptyPrefix))
+				sd.Methods = append(sd.Methods, buildHTTPRule(g, service, method, bind))
 			}
-			sd.Methods = append(sd.Methods, buildHTTPRule(g, service, method, rule, omitemptyPrefix))
+			sd.Methods = append(sd.Methods, buildHTTPRule(g, service, method, rule))
 		} else if !omitempty && !method.Desc.IsStreamingClient() && !method.Desc.IsStreamingServer() {
 			path := fmt.Sprintf("%s/%s/%s", omitemptyPrefix, service.Desc.FullName(), method.Desc.Name())
-			sd.Methods = append(sd.Methods, buildMethodDesc(g, method, http.MethodPost, path))
+			sd.Methods = append(sd.Methods, buildMethodDesc(g, method, http.MethodPost, path, nil))
 		}
 	}
 	if len(sd.Methods) != 0 {
@@ -117,8 +117,7 @@ func genService(_ *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFi
 func hasHTTPRule(services []*protogen.Service) bool {
 	for _, service := range services {
 		for _, method := range service.Methods {
-			rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
-			if rule != nil && ok {
+			if _, ok := httprule.Get(method.Desc); ok {
 				return true
 			}
 		}
@@ -126,50 +125,31 @@ func hasHTTPRule(services []*protogen.Service) bool {
 	return false
 }
 
-func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *protogen.Method, rule *annotations.HttpRule, omitemptyPrefix string) *methodDesc {
-	var (
-		path         string
-		method       string
-		body         string
-		responseBody string
-	)
-
-	switch pattern := rule.Pattern.(type) {
-	case *annotations.HttpRule_Get:
-		path = pattern.Get
-		method = http.MethodGet
-	case *annotations.HttpRule_Put:
-		path = pattern.Put
-		method = http.MethodPut
-	case *annotations.HttpRule_Post:
-		path = pattern.Post
-		method = http.MethodPost
-	case *annotations.HttpRule_Delete:
-		path = pattern.Delete
-		method = http.MethodDelete
-	case *annotations.HttpRule_Patch:
-		path = pattern.Patch
-		method = http.MethodPatch
-	case *annotations.HttpRule_Custom:
-		path = pattern.Custom.Path
-		method = pattern.Custom.Kind
+func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *protogen.Method, rule *annotations.HttpRule) *methodDesc {
+	// 解析与校验统一走共享 httprule:缺 pattern、畸形模板(/**/*、嵌套
+	// 或重复变量、尾斜杠等)在此报错终止,不再静默合成默认路由——
+	// 与 dart/TS 插件对同一输入的拒绝语义对齐。
+	parsed, err := httprule.ParseRule(rule)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "\u001B[31mERROR\u001B[m: %s.%s: %v\n", service.Desc.FullName(), m.Desc.Name(), err)
+		os.Exit(2)
 	}
+	method := parsed.Method
 	if method == "" {
 		method = http.MethodPost
 	}
-	if path == "" {
-		path = fmt.Sprintf("%s/%s/%s", omitemptyPrefix, service.Desc.FullName(), m.Desc.Name())
-	}
-	body = rule.Body
-	responseBody = rule.ResponseBody
-	md := buildMethodDesc(g, m, method, path)
+	body := parsed.Body
+	responseBody := rule.ResponseBody
+	varFieldPaths := templateVarFieldPaths(parsed.Template)
+	routePath := renderRoutePath(parsed.Template)
+	md := buildMethodDesc(g, m, method, routePath, varFieldPaths)
 	// Client-streaming RPCs are served over WebSocket, whose handshake is always an
 	// HTTP GET regardless of the declared verb. Declaring a body for them is legitimate
 	// (it identifies the streamed message field), so skip the GET/DELETE body warnings.
 	if !m.Desc.IsStreamingClient() {
 		if method == http.MethodGet || method == http.MethodDelete {
 			if body != "" {
-				_, _ = fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: %s %s body should not be declared.\n", method, path)
+				_, _ = fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: %s %s body should not be declared.\n", method, routePath)
 			}
 		} else {
 			// An undeclared body is only a silent-degradation bug when request fields
@@ -177,8 +157,8 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 			// When every field is path-bound (or the request has none), the empty body
 			// is the intended contract: opaque-payload endpoints keep the body out of
 			// proto binding entirely and consume it as raw bytes.
-			if body == "" && !allFieldsPathBound(inputFieldNames(m), path) {
-				_, _ = fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: %s %s does not declare a body.\n", method, path)
+			if body == "" && !allFieldsPathBound(inputFieldNames(m), varFieldPaths) {
+				_, _ = fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: %s %s does not declare a body.\n", method, routePath)
 			}
 		}
 	}
@@ -186,7 +166,7 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 		// 客户端流式：请求体就是字节流本身，不经 proto 绑定；注解里的
 		// body 声明对流式语义无意义，忽略并提示。
 		if body != "" {
-			_, _ = fmt.Fprintf(os.Stderr, "\u001B[33mWARN\u001B[m: %s %s body declaration ignored for client-streaming method; the request body is the byte stream itself.\n", method, path)
+			_, _ = fmt.Fprintf(os.Stderr, "\u001B[33mWARN\u001B[m: %s %s body declaration ignored for client-streaming method; the request body is the byte stream itself.\n", method, routePath)
 		}
 		md.HasBody = false
 	} else if body == "*" {
@@ -201,7 +181,7 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 				os.Stderr,
 				"\u001B[31mERROR\u001B[m: The corresponding body field '%s' declaration in request message could not be found in '%s'\n",
 				body,
-				path,
+				routePath,
 			)
 			os.Exit(2)
 		}
@@ -225,7 +205,7 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 				os.Stderr,
 				"\u001B[31mERROR\u001B[m: The corresponding response_body field '%s' declaration in response message could not be found in '%s'\n",
 				responseBody,
-				path,
+				routePath,
 			)
 			os.Exit(2)
 		}
@@ -234,40 +214,30 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 	return md
 }
 
-func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path string) *methodDesc {
+func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path string, varFieldPaths [][]string) *methodDesc {
 	defer func() { methodSets[m.GoName]++ }()
 
-	pathTemplate := path
-	vars := buildPathVars(path)
 	var pathVarNames []string
-
-	for v, s := range vars {
+	for _, fp := range varFieldPaths {
 		fields := m.Input.Desc.Fields()
-
-		if s != nil {
-			path = replacePath(v, *s, path)
-		}
-		for _, field := range strings.Split(v, ".") {
+		for _, field := range fp {
 			if strings.TrimSpace(field) == "" {
 				continue
 			}
-			if strings.Contains(field, ":") {
-				field = strings.Split(field, ":")[0]
-			}
 			fd := fields.ByName(protoreflect.Name(field))
 			if fd == nil {
-				fmt.Fprintf(os.Stderr, "\u001B[31mERROR\u001B[m: The corresponding field '%s' declaration in message could not be found in '%s'\n", v, path)
+				fmt.Fprintf(os.Stderr, "\u001B[31mERROR\u001B[m: The corresponding field '%s' declaration in message could not be found in '%s'\n", strings.Join(fp, "."), path)
 				os.Exit(2)
 			}
 			if fd.IsMap() {
-				fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: The field in path:'%s' shouldn't be a map.\n", v)
+				fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: The field in path:'%s' shouldn't be a map.\n", strings.Join(fp, "."))
 			} else if fd.IsList() {
-				fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: The field in path:'%s' shouldn't be a list.\n", v)
+				fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: The field in path:'%s' shouldn't be a list.\n", strings.Join(fp, "."))
 			} else if fd.Kind() == protoreflect.MessageKind || fd.Kind() == protoreflect.GroupKind {
 				fields = fd.Message().Fields()
 			}
 		}
-		pathVarNames = append(pathVarNames, v)
+		pathVarNames = append(pathVarNames, strings.Join(fp, "."))
 	}
 	comment := m.Comments.Leading.String() + m.Comments.Trailing.String()
 	if comment != "" {
@@ -288,9 +258,8 @@ func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path
 		StreamElem:      streamElemGoIdent(g, m),
 		Comment:         comment,
 		Path:            path,
-		PathTemplate:    pathTemplate,
 		Method:          method,
-		HasVars:         len(vars) > 0,
+		HasVars:         len(varFieldPaths) > 0,
 		PathVarsList:    formatStringSlice(pathVarNames),
 		ReplyHTTPBody:   isHTTPBodyMessage(m.Output.Desc),
 		ClientStreaming: m.Desc.IsStreamingClient(),
@@ -330,22 +299,87 @@ func isHTTPBodyMessage(md protoreflect.MessageDescriptor) bool {
 	return md != nil && md.FullName() == httpBodyFullName
 }
 
-func buildPathVars(path string) (res map[string]*string) {
-	if strings.HasSuffix(path, "/") {
-		fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: Path %s should not end with \"/\" \n", path)
-	}
-	pattern := regexp.MustCompile(`(?i){([a-z.0-9_\s]*)=?([^{}]*)}`)
-	matches := pattern.FindAllStringSubmatch(path, -1)
-	res = make(map[string]*string, len(matches))
-	for _, m := range matches {
-		name := strings.TrimSpace(m[1])
-		if len(name) > 1 && len(m[2]) > 0 {
-			res[name] = &m[2]
-		} else {
-			res[name] = nil
+// templateVarFieldPaths 收集模板中全部顶层变量段的字段路径,按段序
+// 确定性返回(旧实现经 map 收集,遍历顺序随机)。
+func templateVarFieldPaths(tmpl httprule.Template) [][]string {
+	var out [][]string
+	for _, seg := range tmpl.Segments {
+		if seg.Kind == httprule.SegmentKindVariable {
+			out = append(out, seg.Variable.FieldPath)
 		}
 	}
-	return
+	return out
+}
+
+// renderRoutePath 从解析后的模板段确定性重建 kratos 路由注册形态。
+// 字面量与通配段原样输出;带显式 matcher 的变量段把 {name=matcher}
+// 重写为 {name:regex}(matcher 内字面量经 regexp.QuoteMeta 转义),
+// 裸变量段保持 {name} 形态。
+//
+// 共享解析器把裸 {name} 与 {name=*} 统一表示为默认单段匹配(语义
+// 等价),二者均渲染为裸形态;替换发生在段重建时的精确跨度上,不再
+// 经由第二条按变量名构造的正则——旧路径中该正则未对变量名做
+// QuoteMeta 且跳过单字符变量,存在跨变量误替换与漏替换。
+func renderRoutePath(tmpl httprule.Template) string {
+	var b strings.Builder
+	b.WriteString("/")
+	for i, seg := range tmpl.Segments {
+		if i > 0 {
+			b.WriteString("/")
+		}
+		renderSegment(&b, seg)
+	}
+	if tmpl.Verb != "" {
+		b.WriteString(":")
+		b.WriteString(tmpl.Verb)
+	}
+	return b.String()
+}
+
+func renderSegment(b *strings.Builder, seg httprule.Segment) {
+	switch seg.Kind {
+	case httprule.SegmentKindLiteral:
+		b.WriteString(seg.Literal)
+	case httprule.SegmentKindMatchSingle:
+		b.WriteString("*")
+	case httprule.SegmentKindMatchMultiple:
+		b.WriteString("**")
+	case httprule.SegmentKindVariable:
+		v := seg.Variable
+		b.WriteString("{")
+		b.WriteString(strings.Join(v.FieldPath, "."))
+		if isDefaultSingleMatch(v.Segments) {
+			// 裸变量或显式 {name=*}:默认单段匹配,保持裸形态。
+			b.WriteString("}")
+			return
+		}
+		b.WriteString(":")
+		b.WriteString(pathTemplateRegex(renderMatcher(v.Segments)))
+		b.WriteString("}")
+	}
+}
+
+// isDefaultSingleMatch 判定变量 matcher 是否为解析器为裸变量填充的
+// 默认单段匹配([MatchSingle] 且无其他段)。
+func isDefaultSingleMatch(segs []httprule.Segment) bool {
+	return len(segs) == 1 && segs[0].Kind == httprule.SegmentKindMatchSingle
+}
+
+// renderMatcher 重建变量 matcher 的原始文本,供 pathTemplateRegex
+// 转成路由正则。
+func renderMatcher(segs []httprule.Segment) string {
+	parts := make([]string, 0, len(segs))
+	for _, seg := range segs {
+		switch seg.Kind {
+		case httprule.SegmentKindLiteral:
+			parts = append(parts, seg.Literal)
+		case httprule.SegmentKindMatchSingle:
+			parts = append(parts, "*")
+		case httprule.SegmentKindMatchMultiple:
+			parts = append(parts, "**")
+		}
+	}
+	return strings.Join(parts, "/")
 }
 
 // inputFieldNames lists the top-level field names of a method's request message.
@@ -358,34 +392,27 @@ func inputFieldNames(m *protogen.Method) []string {
 	return names
 }
 
-// allFieldsPathBound reports whether every listed request field is consumed by a
-// path variable of this pattern. A field list with no entries is vacuously bound:
-// with nothing left that could fall back from body to query binding, an undeclared
-// body is a legitimate contract rather than a degradation bug. Dotted path
-// variables (e.g. "{foo.bar}") deliberately bind no top-level field name, so
-// nested bindings stay on the warning side of the check.
-func allFieldsPathBound(fieldNames []string, path string) bool {
-	vars := buildPathVars(path)
+// allFieldsPathBound reports whether every listed request field is consumed
+// by a top-level path variable of this template. A field list with no
+// entries is vacuously bound: with nothing left that could fall back from
+// body to query binding, an undeclared body is a legitimate contract rather
+// than a degradation bug. Dotted path variables (e.g. "{foo.bar}")
+// deliberately bind no top-level field name, so nested bindings stay on the
+// warning side of the check.
+func allFieldsPathBound(fieldNames []string, varFieldPaths [][]string) bool {
 	for _, name := range fieldNames {
-		if _, ok := vars[name]; !ok {
+		bound := false
+		for _, fp := range varFieldPaths {
+			if len(fp) == 1 && fp[0] == name {
+				bound = true
+				break
+			}
+		}
+		if !bound {
 			return false
 		}
 	}
 	return true
-}
-
-func replacePath(name string, value string, path string) string {
-	pattern := regexp.MustCompile(fmt.Sprintf(`(?i){([\s]*%s\b[\s]*)=?([^{}]*)}`, name))
-	idx := pattern.FindStringIndex(path)
-	if len(idx) > 0 {
-		path = fmt.Sprintf("%s{%s:%s}%s",
-			path[:idx[0]], // The start of the match
-			name,
-			pathTemplateRegex(value),
-			path[idx[1]:],
-		)
-	}
-	return path
 }
 
 func pathTemplateRegex(value string) string {

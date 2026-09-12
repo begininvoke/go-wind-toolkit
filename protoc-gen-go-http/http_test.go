@@ -4,99 +4,74 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
 )
 
-func TestNoParameters(t *testing.T) {
-	path := "/test/noparams"
-	m := buildPathVars(path)
-	if !reflect.DeepEqual(m, map[string]*string{}) {
-		t.Fatalf("Map should be empty")
+// TestRenderRoutePath 验证从解析后模板重建的 kratos 路由注册形态:
+// 裸变量保持裸形态;带显式 matcher 的变量段重写为 {name:regex}
+// (matcher 字面量经 QuoteMeta 转义);单字符变量名与长名一视同仁
+// (旧正则实现跳过单字符变量导致其 matcher 保留在路由里)。
+func TestRenderRoutePath(t *testing.T) {
+	tests := []struct {
+		name     string
+		template string
+		want     string
+	}{
+		{name: "no vars", template: "/test/noparams", want: "/test/noparams"},
+		{name: "plain var stays bare", template: "/test/{message.id}", want: "/test/{message.id}"},
+		{name: "single char var matcher rewritten", template: "/test/{a=x}", want: "/test/{a:x}"},
+		{name: "literal matcher rewritten", template: "/test/{message.id=test}", want: "/test/{message.id:test}"},
+		{name: "wildcard matcher rewritten", template: "/test/{message.name=messages/*}", want: "/test/{message.name:messages/[^/]+}"},
+		{name: "matcher with following literal", template: "/test/{message.name=messages/*}/books", want: "/test/{message.name:messages/[^/]+}/books"},
+		{name: "plain and explicit vars mixed", template: "/test/{message.id}/{message.name=messages/*}", want: "/test/{message.id}/{message.name:messages/[^/]+}"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpl, err := httprule.ParseTemplate(tt.template)
+			if err != nil {
+				t.Fatalf("ParseTemplate(%q): %v", tt.template, err)
+			}
+			if got := renderRoutePath(tmpl); got != tt.want {
+				t.Errorf("renderRoutePath(%q) = %q, want %q", tt.template, got, tt.want)
+			}
+		})
 	}
 }
 
-func TestSingleParam(t *testing.T) {
-	path := "/test/{message.id}"
-	m := buildPathVars(path)
-	if !reflect.DeepEqual(len(m), 1) {
-		t.Fatalf("len(m) not is 1")
-	}
-	if m["message.id"] != nil {
-		t.Fatalf(`m["message.id"] should be empty`)
-	}
-}
-
-func TestTwoParametersReplacement(t *testing.T) {
-	path := "/test/{message.id}/{message.name=messages/*}"
-	m := buildPathVars(path)
-	if len(m) != 2 {
-		t.Fatal("len(m) should be 2")
-	}
-	if m["message.id"] != nil {
-		t.Fatal(`m["message.id"] should be nil`)
-	}
-	if m["message.name"] == nil {
-		t.Fatal(`m["message.name"] should not be nil`)
-	}
-	if *m["message.name"] != "messages/*" {
-		t.Fatal(`m["message.name"] should be "messages/*"`)
-	}
-}
-
-func TestNoReplacePath(t *testing.T) {
-	path := "/test/{message.id=test}"
-	if !reflect.DeepEqual(replacePath("message.id", "test", path), "/test/{message.id:test}") {
-		t.Fatal(`replacePath("message.id", "test", path) should be "/test/{message.id:test}"`)
-	}
-	path = "/test/{message.id=test/*}"
-	if !reflect.DeepEqual(replacePath("message.id", "test/*", path), "/test/{message.id:test/[^/]+}") {
-		t.Fatal(`replacePath("message.id", "test/*", path) should be "/test/{message.id:test/[^/]+}"`)
-	}
-}
-
-func TestReplacePath(t *testing.T) {
-	path := "/test/{message.id}/{message.name=messages/*}"
-	newPath := replacePath("message.name", "messages/*", path)
-	if !reflect.DeepEqual("/test/{message.id}/{message.name:messages/[^/]+}", newPath) {
-		t.Fatal(`replacePath("message.name", "messages/*", path) should be "/test/{message.id}/{message.name:messages/[^/]+}"`)
-	}
-}
-
-func TestIteration(t *testing.T) {
-	path := "/test/{message.id}/{message.name=messages/*}"
-	vars := buildPathVars(path)
-	for v, s := range vars {
-		if s != nil {
-			path = replacePath(v, *s, path)
+// TestRenderRoutePathRejectsMalformedTemplates 共享解析器对畸形模板
+// 报错——旧的自研正则全部照收。
+func TestRenderRoutePathRejectsMalformedTemplates(t *testing.T) {
+	for _, template := range []string{
+		"/test/**/*",
+		"/test/{a={b}}",
+		"/test/{a}/{a}",
+		"",
+	} {
+		if _, err := httprule.ParseTemplate(template); err == nil {
+			t.Errorf("ParseTemplate(%q) should reject the malformed template", template)
 		}
 	}
-	if !reflect.DeepEqual("/test/{message.id}/{message.name:messages/[^/]+}", path) {
-		t.Fatal(`replacePath("message.name", "messages/*", path) should be "/test/{message.id}/{message.name:messages/[^/]+}"`)
-	}
 }
 
-func TestIterationMiddle(t *testing.T) {
-	path := "/test/{message.name=messages/*}/books"
-	vars := buildPathVars(path)
-	for v, s := range vars {
-		if s != nil {
-			path = replacePath(v, *s, path)
-		}
+// TestTemplateVarFieldPaths 变量字段路径按段序确定性返回。
+func TestTemplateVarFieldPaths(t *testing.T) {
+	tmpl, err := httprule.ParseTemplate("/test/{message.id}/{message.name=messages/*}")
+	if err != nil {
+		t.Fatalf("ParseTemplate: %v", err)
 	}
-	if !reflect.DeepEqual("/test/{message.name:messages/[^/]+}/books", path) {
-		t.Fatal(`replacePath("message.name", "messages/*", path) should be "/test/{message.name:messages/[^/]+}/books"`)
+	got := templateVarFieldPaths(tmpl)
+	want := [][]string{{"message", "id"}, {"message", "name"}}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("templateVarFieldPaths = %v, want %v", got, want)
 	}
-}
 
-func TestReplaceBoundary(t *testing.T) {
-	path := "/test/{message.namespace=*}/name/{message.name=*}"
-	vars := buildPathVars(path)
-	for v, s := range vars {
-		if s != nil {
-			path = replacePath(v, *s, path)
-		}
+	tmpl, err = httprule.ParseTemplate("/test/noparams")
+	if err != nil {
+		t.Fatalf("ParseTemplate: %v", err)
 	}
-	if !reflect.DeepEqual("/test/{message.namespace:[^/]+}/name/{message.name:[^/]+}", path) {
-		t.Fatal(`"/test/{message.namespace=*}/name/{message.name=*}" should be "/test/{message.namespace:[^/]+}/name/{message.name:[^/]+}"`)
+	if got := templateVarFieldPaths(tmpl); got != nil {
+		t.Fatalf("templateVarFieldPaths on varless template = %v, want nil", got)
 	}
 }
 
@@ -162,7 +137,6 @@ func TestHTTPTemplateBindingAndHandler(t *testing.T) {
 				Request:      "HelloRequest",
 				Reply:        "HelloReply",
 				Path:         "/helloworld/{name}",
-				PathTemplate: "/helloworld/{name}",
 				Method:       "GET",
 				HasVars:      true,
 				PathVarsList: `[]string{"name"}`,
@@ -173,7 +147,6 @@ func TestHTTPTemplateBindingAndHandler(t *testing.T) {
 				Request:      "CreateHelloRequest",
 				Reply:        "HelloReply",
 				Path:         "/helloworld",
-				PathTemplate: "/helloworld",
 				Method:       "POST",
 				HasBody:      true,
 				BodyField:    "*",
@@ -184,7 +157,6 @@ func TestHTTPTemplateBindingAndHandler(t *testing.T) {
 				Request:      "UpdateHelloRequest",
 				Reply:        "HelloReply",
 				Path:         "/helloworld/{id}",
-				PathTemplate: "/helloworld/{id}",
 				Method:       "PATCH",
 				HasBody:      true,
 				BodyField:    "data",
@@ -255,7 +227,6 @@ func TestHTTPTemplateResponseBody(t *testing.T) {
 				Request:      "UploadHelloRequest",
 				Reply:        "UploadHelloReply",
 				Path:         "/helloworld/upload",
-				PathTemplate: "/helloworld/upload",
 				Method:       "POST",
 				HasBody:      true,
 				BodyField:    "*",
@@ -270,16 +241,16 @@ func TestHTTPTemplateResponseBody(t *testing.T) {
 }
 
 func TestAllFieldsPathBound(t *testing.T) {
-	if !allFieldsPathBound([]string{"source", "key"}, "/open/v1/webhooks/{source}/{key}") {
+	if !allFieldsPathBound([]string{"source", "key"}, [][]string{{"source"}, {"key"}}) {
 		t.Fatal("fields fully consumed by path variables must be reported as bound")
 	}
-	if !allFieldsPathBound(nil, "/test/noparams") {
+	if !allFieldsPathBound(nil, nil) {
 		t.Fatal("a request with no fields is vacuously bound")
 	}
-	if allFieldsPathBound([]string{"source", "filter"}, "/open/v1/webhooks/{source}/{key}") {
+	if allFieldsPathBound([]string{"source", "filter"}, [][]string{{"source"}, {"key"}}) {
 		t.Fatal("a field no path variable binds must not be reported as bound")
 	}
-	if allFieldsPathBound([]string{"foo"}, "/test/{foo.bar}") {
+	if allFieldsPathBound([]string{"foo"}, [][]string{{"foo", "bar"}}) {
 		t.Fatal("a dotted path variable must not count as binding a top-level field")
 	}
 }

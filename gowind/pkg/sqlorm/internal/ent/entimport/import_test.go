@@ -662,10 +662,10 @@ func MockMySQLM2MTwoTypes() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -790,10 +790,10 @@ func MockMySQLM2MSameType() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -918,10 +918,10 @@ func MockMySQLM2MBidirectional() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -1051,10 +1051,10 @@ func MockMySQLO2OTwoTypes() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -1123,10 +1123,10 @@ func MockMySQLO2OTwoTypes() *schema.Schema {
 				Name: "user_card",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: true,
 				},
 			},
@@ -1212,10 +1212,10 @@ func MockMySQLO2OSameType() *schema.Schema {
 				Name: "value",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -1223,10 +1223,10 @@ func MockMySQLO2OSameType() *schema.Schema {
 				Name: "node_next",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: true,
 				},
 			},
@@ -1295,10 +1295,10 @@ func MockMySQLO2OBidirectional() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -1314,10 +1314,10 @@ func MockMySQLO2OBidirectional() *schema.Schema {
 				Name: "user_spouse",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: true,
 				},
 			},
@@ -1386,10 +1386,10 @@ func MockMySQLO2MTwoTypes() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -1440,10 +1440,10 @@ func MockMySQLO2MTwoTypes() *schema.Schema {
 				Name: "user_pets",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: true,
 				},
 			},
@@ -1512,10 +1512,10 @@ func MockMySQLO2MSameType() *schema.Schema {
 				Name: "value",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -1523,10 +1523,10 @@ func MockMySQLO2MSameType() *schema.Schema {
 				Name: "node_children",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: true,
 				},
 			},
@@ -1600,10 +1600,10 @@ func MockMySQLO2XOtherSideIgnored() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},
@@ -1672,10 +1672,10 @@ func MockMySQLO2XOtherSideIgnored() *schema.Schema {
 				Name: "user_pets",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: true,
 				},
 			},
@@ -1778,10 +1778,10 @@ func MockMySQLM2MJoinTableOnly() *schema.Schema {
 				Name: "age",
 				Type: &schema.ColumnType{
 					Type: &schema.IntegerType{
-						T:        "bigint",
+						T:        "int",
 						Unsigned: false,
 					},
-					Raw:  "bigint",
+					Raw:  "int",
 					Null: false,
 				},
 			},

@@ -253,14 +253,19 @@ func upsertNode(field fieldFunc, table *schema.Table) (*schemast.UpsertSchema, e
 	if collation != "" {
 		annotation.Collation = collation
 	}
+	// 实际表名与 ent 默认表名(类型名复数化)不一致时,注解记录**实际**表名,
+	// 保证生成的 schema 指向内省到的真实表;一致时该字段留空。
 	if tableName(table.Name) != table.Name {
-		annotation.Table = tableName(table.Name)
-	} else {
 		annotation.Table = table.Name
 	}
 
-	upsert.Annotations = []entschema.Annotation{
-		annotation,
+	// 注解无任何内容时不设置 Annotations,序列化为 `return nil`
+	// (与 ent 官方 entimport 行为一致)。
+	if annotation.Table != "" || annotation.Charset != "" ||
+		annotation.Collation != "" || annotation.WithComments != nil {
+		upsert.Annotations = []entschema.Annotation{
+			annotation,
+		}
 	}
 
 	if comment != "" {

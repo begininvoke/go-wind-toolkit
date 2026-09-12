@@ -121,7 +121,7 @@ func (m *MySQL) convertInteger(typ *schema.IntegerType, name string) (f ent.Fiel
 	case mMediumInt:
 		f = field.Int32(name)
 	case mInt:
-		f = field.Int32(name)
+		f = field.Int(name)
 	case mBigInt:
 		f = field.Int64(name)
 	}

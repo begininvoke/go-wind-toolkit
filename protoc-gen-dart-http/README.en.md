@@ -11,6 +11,7 @@ Generates Dart HTTP client code from Protobuf definitions annotated with [HTTP r
 - **Transport abstraction** — The `ClientTransport` abstract interface supports any HTTP client implementation (package:http, dio, etc.)
 - **Streaming support** — Server-streaming RPCs map to SSE; bidirectional streaming RPCs map to WebSocket
 - **Complete data models** — Auto-generates `fromJson`, `toJson`, `toString`, `==`, `hashCode`, `copyWith`
+- **Binary proto codec** — Every message class natively generates `writeToBuffer()` / `fromBuffer()` (backed by the self-contained `proto_wire.dart` runtime emitted at the output root, zero third-party dependencies); enum classes carry a `wire` value and `fromWire()`. Supported: scalars, enums, nested messages, repeated fields (packed reads/writes tolerate single values), maps, bytes (base64), Timestamp, Duration, FieldMask, Empty, and the wrapper series; Any/Struct/Value/ListValue and google.type.* throw `UnsupportedError`
 - **Well-known type mapping** — Automatically maps `google.protobuf.Timestamp` and other Well-known types to native Dart types
 - **Cross-package references** — Types referenced across protobuf packages use PascalCase prefixes (e.g., `EinrideExampleSyntaxV1Message`)
 - **Nested types** — Uses the Dart protobuf convention `$` separator (e.g., `Message$NestedMessage`)
@@ -324,6 +325,39 @@ service FreightService {
 // Generated code
 const defaultHost = 'freight-example.einride.tech';
 ```
+
+## additional_bindings Support
+
+Each `additional_bindings` entry in `google.api.http` produces a standalone method named `<MethodName>Alt<N>` (N starts at 1, numbered in declaration order within the annotation):
+
+```protobuf
+rpc CreateBook(CreateBookRequest) returns (Book) {
+  option (google.api.http) = {
+    post: "/v1/{parent=publishers/*}/books"
+    body: "book"
+    additional_bindings {
+      post: "/v1/books"
+      body: "book"
+    }
+    additional_bindings {
+      get: "/v1/books/{isbn}"
+    }
+  };
+}
+```
+
+```dart
+// Generated code (each binding derives its own path validation, body selection, and query parameters)
+Future<Book> createBook(CreateBookRequest request, {Map<String, String>? headers});     // POST /v1/{parent}/books
+Future<Book> createBookAlt1(CreateBookRequest request, {Map<String, String>? headers}); // POST /v1/books
+Future<Book> createBookAlt2(CreateBookRequest request, {Map<String, String>? headers}); // GET /v1/books/{isbn}
+```
+
+Notes:
+
+- Each variant's doc comment states its HTTP method and route template
+- Path validation applies per binding (in the example above, only `createBookAlt2` requires `isbn` to be non-null)
+- Streaming RPCs only support the primary binding; additional bindings are skipped with a warning
 
 ## Well-known Type Mapping
 

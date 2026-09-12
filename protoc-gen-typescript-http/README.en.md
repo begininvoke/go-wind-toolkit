@@ -15,10 +15,10 @@ Generates TypeScript types and service clients from Protobuf definitions annotat
 ## Installation
 
 ```bash
-go install github.com/go-kratos/protoc-gen-typescript-http@latest
+go install github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http@latest
 ```
 
-Or download a prebuilt binary from [releases](./releases).
+Or download a prebuilt binary from [releases](../../releases).
 
 ## Invocation
 
@@ -91,6 +91,41 @@ import { DEFAULT_HOST, createShipperServiceClient } from "./gen";
 
 const baseUrl = `https://${DEFAULT_HOST}`;
 ```
+
+## additional_bindings Support
+
+Each `additional_bindings` entry in `google.api.http` produces a standalone member named `<Method>Alt<N>` (N starts at 1, numbered in declaration order within the annotation), with the interface declaration and the client implementation generated together:
+
+```protobuf
+rpc CreateBook(CreateBookRequest) returns (Book) {
+  option (google.api.http) = {
+    post: "/v1/{parent=publishers/*}/books"
+    body: "book"
+    additional_bindings {
+      post: "/v1/books"
+      body: "book"
+    }
+    additional_bindings {
+      get: "/v1/books/{isbn}"
+    }
+  };
+}
+```
+
+```typescript
+// Generated code (each binding derives its own path validation, body selection, and query parameters)
+interface BookService {
+  CreateBook(request: CreateBookRequest): Promise<Book>;     // POST /v1/{parent}/books
+  CreateBookAlt1(request: CreateBookRequest): Promise<Book>; // POST /v1/books
+  CreateBookAlt2(request: CreateBookRequest): Promise<Book>; // GET /v1/books/{isbn}
+}
+```
+
+Notes:
+
+- Each variant's comment states its HTTP method and route template
+- Path validation applies per binding (in the example above, only `CreateBookAlt2` requires `isbn` to be non-null)
+- Streaming RPCs only support the primary binding; additional bindings are skipped with a warning
 
 ## Streaming
 

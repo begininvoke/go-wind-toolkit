@@ -15,10 +15,10 @@
 ## インストール
 
 ```bash
-go install github.com/go-kratos/protoc-gen-typescript-http@latest
+go install github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http@latest
 ```
 
-または [releases](./releases) からプリビルド済みバイナリをダウンロードしてください。
+または [releases](../../releases) からプリビルド済みバイナリをダウンロードしてください。
 
 ## 呼び出し方法
 
@@ -91,6 +91,41 @@ import { DEFAULT_HOST, createShipperServiceClient } from "./gen";
 
 const baseUrl = `https://${DEFAULT_HOST}`;
 ```
+
+## additional_bindings のサポート
+
+`google.api.http` の `additional_bindings` はそれぞれ独立したメンバーとして生成され、`<Method>Alt<N>` と命名されます（N は 1 から始まり、注釈内の宣言順に採番）。インターフェース宣言とクライアント実装は同時に生成されます:
+
+```protobuf
+rpc CreateBook(CreateBookRequest) returns (Book) {
+  option (google.api.http) = {
+    post: "/v1/{parent=publishers/*}/books"
+    body: "book"
+    additional_bindings {
+      post: "/v1/books"
+      body: "book"
+    }
+    additional_bindings {
+      get: "/v1/books/{isbn}"
+    }
+  };
+}
+```
+
+```typescript
+// 生成コード（各バインディングが独自のパス検証・body 選択・クエリパラメータ導出を行う）
+interface BookService {
+  CreateBook(request: CreateBookRequest): Promise<Book>;     // POST /v1/{parent}/books
+  CreateBookAlt1(request: CreateBookRequest): Promise<Book>; // POST /v1/books
+  CreateBookAlt2(request: CreateBookRequest): Promise<Book>; // GET /v1/books/{isbn}
+}
+```
+
+注意:
+
+- 各バリアントのコメントには HTTP メソッドとルートテンプレートが明記されます
+- パス検証はバインディングごとに独立して適用されます（上の例では `CreateBookAlt2` のみが `isbn` 非空を要求します）
+- ストリーミング RPC は主バインディングのみ対応し、追加バインディングは警告付きでスキップされます
 
 ## ストリーミング通信
 

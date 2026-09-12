@@ -11,6 +11,7 @@
 - **トランスポート抽象化** — `ClientTransport` 抽象インターフェースにより、任意の HTTP クライアント実装（package:http、dio など）をサポート
 - **ストリーミングサポート** — サーバーストリーミング RPC は SSE に、双方向ストリーミング RPC は WebSocket にマッピング
 - **完全なデータモデル** — `fromJson`、`toJson`、`toString`、`==`、`hashCode`、`copyWith` を自動生成
+- **バイナリ proto コーデック** — 各メッセージクラスは `writeToBuffer()` / `fromBuffer()` をネイティブ生成します（出力ルートに自己完結型の `proto_wire.dart` ランタイムを併生成、サードパーティ依存ゼロ）。enum クラスは `wire` 値と `fromWire()` を持ちます。対応範囲: スカラー、enum、ネスト、repeated（packed の読み書きは単一値を許容）、map、bytes（base64）、Timestamp、Duration、FieldMask、Empty、ラッパー系。Any/Struct/Value/ListValue および google.type.* は `UnsupportedError` を送出します
 - **Well-known 型マッピング** — `google.protobuf.Timestamp` などの Well-known 型を Dart ネイティブ型に自動マッピング
 - **クロスパッケージ参照** — protobuf パッケージ間の型参照は PascalCase プレフィックスを使用（例: `EinrideExampleSyntaxV1Message`）
 - **ネスト型** — Dart protobuf 慣例の `$` セパレータを使用（例: `Message$NestedMessage`）
@@ -324,6 +325,39 @@ service FreightService {
 // 生成コード
 const defaultHost = 'freight-example.einride.tech';
 ```
+
+## additional_bindings のサポート
+
+`google.api.http` の `additional_bindings` はそれぞれ独立したメソッドとして生成され、`<メソッド名>Alt<N>` と命名されます（N は 1 から始まり、注釈内の宣言順に採番）:
+
+```protobuf
+rpc CreateBook(CreateBookRequest) returns (Book) {
+  option (google.api.http) = {
+    post: "/v1/{parent=publishers/*}/books"
+    body: "book"
+    additional_bindings {
+      post: "/v1/books"
+      body: "book"
+    }
+    additional_bindings {
+      get: "/v1/books/{isbn}"
+    }
+  };
+}
+```
+
+```dart
+// 生成コード（各バインディングが独自のパス検証・body 選択・クエリパラメータ導出を行う）
+Future<Book> createBook(CreateBookRequest request, {Map<String, String>? headers});     // POST /v1/{parent}/books
+Future<Book> createBookAlt1(CreateBookRequest request, {Map<String, String>? headers}); // POST /v1/books
+Future<Book> createBookAlt2(CreateBookRequest request, {Map<String, String>? headers}); // GET /v1/books/{isbn}
+```
+
+注意:
+
+- 各バリアントのドキュメントコメントには HTTP メソッドとルートテンプレートが明記されます
+- パス検証はバインディングごとに独立して適用されます（上の例では `createBookAlt2` のみが `isbn` 非空を要求します）
+- ストリーミング RPC は主バインディングのみ対応し、追加バインディングは警告付きでスキップされます
 
 ## Well-known 型マッピング
 

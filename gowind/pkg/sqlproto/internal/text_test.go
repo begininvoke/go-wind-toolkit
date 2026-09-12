@@ -3,14 +3,14 @@ package internal
 import (
 	"testing"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlproto/internal/mux"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 // TestNewTextConvert tests the creation of a Text converter
 func TestNewTextConvert(t *testing.T) {
 	opts := &ConvertOptions{
 		schemaPath: "CREATE TABLE users (id INT PRIMARY KEY, name VARCHAR(100))",
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},

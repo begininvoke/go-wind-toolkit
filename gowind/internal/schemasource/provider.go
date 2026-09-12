@@ -1,4 +1,4 @@
-package mux
+package schemasource
 
 import (
 	"database/sql"
@@ -17,7 +17,7 @@ func init() {
 	Default.RegisterProvider(textProvider, "text", "file")
 }
 
-func mysqlProvider(dsn string) (*ImportDriver, error) {
+func mysqlProvider(dsn string) (*Driver, error) {
 	db, err := sql.Open(dialect.MySQL, dsn)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func mysqlProvider(dsn string) (*ImportDriver, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ImportDriver{
+	return &Driver{
 		Closer:     db,
 		Inspector:  drv,
 		Dialect:    dialect.MySQL,
@@ -42,7 +42,7 @@ func mysqlProvider(dsn string) (*ImportDriver, error) {
 	}, nil
 }
 
-func postgresProvider(dsn string) (*ImportDriver, error) {
+func postgresProvider(dsn string) (*Driver, error) {
 	dsn = "postgres://" + dsn
 	db, err := sql.Open(dialect.Postgres, dsn)
 	if err != nil {
@@ -64,7 +64,7 @@ func postgresProvider(dsn string) (*ImportDriver, error) {
 	if s := parsed.Query().Get("search_path"); s != "" {
 		schemaName = s
 	}
-	return &ImportDriver{
+	return &Driver{
 		Closer:     db,
 		Inspector:  drv,
 		Dialect:    dialect.Postgres,
@@ -72,8 +72,8 @@ func postgresProvider(dsn string) (*ImportDriver, error) {
 	}, nil
 }
 
-func textProvider(dsn string) (*ImportDriver, error) {
-	return &ImportDriver{
+func textProvider(dsn string) (*Driver, error) {
+	return &Driver{
 		SchemaName: dsn,
 		Dialect:    "text",
 	}, nil

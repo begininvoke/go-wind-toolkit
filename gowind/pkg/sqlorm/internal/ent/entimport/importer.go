@@ -5,9 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm/internal/ent/mux"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 // Importer imports the schema from the database specified by the DSN and writes it to the schemaPath.
@@ -22,13 +21,13 @@ func Importer(ctx context.Context, dsn, schemaPath *string, includeTables, exclu
 	_ = os.MkdirAll(*schemaPath, 0o755)
 
 	// Normalize the DSN to ensure it has a valid scheme
-	normalizedDSN := normalizeDSN(*dsn)
+	normalizedDSN := schemasource.NormalizeDSN(*dsn)
 
-	drv, err := mux.Default.OpenImport(normalizedDSN)
+	drv, err := schemasource.Default.Open(normalizedDSN)
 	if err != nil {
 		return fmt.Errorf("entimport: failed to create import driver: %w", err)
 	}
-	defer func(drv *mux.ImportDriver) {
+	defer func(drv *schemasource.Driver) {
 		if drv != nil {
 			_ = drv.Close()
 		}
@@ -54,23 +53,4 @@ func Importer(ctx context.Context, dsn, schemaPath *string, includeTables, exclu
 	}
 
 	return nil
-}
-
-// normalizeDSN normalizes the DSN to ensure it has a valid scheme.
-// If the input is a file path, it will be prefixed with "file://".
-// If it's SQL text content, it will be prefixed with "text://".
-// If it already has a scheme (mysql://, postgres://, etc.), it's returned as-is.
-func normalizeDSN(dsn string) string {
-	// Check if it already has a scheme
-	if strings.Contains(dsn, "://") {
-		return dsn
-	}
-
-	// Check if it's a file path
-	if _, err := os.Stat(dsn); err == nil {
-		return "file://" + dsn
-	}
-
-	// Treat it as SQL text content
-	return "text://" + dsn
 }

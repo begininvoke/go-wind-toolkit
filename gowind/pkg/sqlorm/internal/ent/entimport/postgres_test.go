@@ -288,7 +288,7 @@ func TestPostgres(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			schemas := createTempDir(t)
 			m := mockMux(ctx, dialect.Postgres, tt.mock, testSchema)
-			drv, err := m.OpenImport("postgres://postgres:pass@localhost:5434/test")
+			drv, err := m.Open("postgres://postgres:pass@localhost:5434/test")
 			r.NoError(err)
 			importer, err := entimport.NewImport(
 				entimport.WithDriver(drv),
@@ -324,7 +324,7 @@ func TestPostgres(t *testing.T) {
 func TestPostgresJoinTableOnly(t *testing.T) {
 	var ctx = context.Background()
 	m := mockMux(ctx, dialect.Postgres, MockPostgresM2MJoinTableOnly(), "public")
-	drv, err := m.OpenImport("postgres://postgres:pass@localhost:5434/test")
+	drv, err := m.Open("postgres://postgres:pass@localhost:5434/test")
 	require.NoError(t, err)
 	importer, err := entimport.NewImport(
 		entimport.WithDriver(drv),

@@ -17,6 +17,8 @@ import (
 	"entgo.io/ent/schema/edge"
 
 	"github.com/go-openapi/inflect"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 // NewImport calls the relevant data source importer based on a given dialect.
@@ -170,23 +172,6 @@ func upsertManyToMany(mutations map[string]schemast.Mutator, table *schema.Table
 	return nil
 }
 
-// Note: at this moment ent doesn't support fields on m2m relations.
-func isJoinTable(table *schema.Table) bool {
-	if table.PrimaryKey == nil || len(table.PrimaryKey.Parts) != 2 || len(table.ForeignKeys) != 2 {
-		return false
-	}
-	// Make sure that the foreign key columns exactly match primary key column.
-	for _, fk := range table.ForeignKeys {
-		if len(fk.Columns) != 1 {
-			return false
-		}
-		if fk.Columns[0] != table.PrimaryKey.Parts[0].C && fk.Columns[0] != table.PrimaryKey.Parts[1].C {
-			return false
-		}
-	}
-	return true
-}
-
 func typeName(tableName string) string {
 	return inflect.Camelize(inflect.Singularize(tableName))
 }
@@ -333,7 +318,7 @@ func schemaMutations(field fieldFunc, tables []*schema.Table) ([]schemast.Mutato
 	mutations := make(map[string]schemast.Mutator)
 	joinTables := make(map[string]*schema.Table)
 	for _, table := range tables {
-		if isJoinTable(table) {
+		if schemasource.IsJoinTable(table) {
 			joinTables[table.Name] = table
 			continue
 		}

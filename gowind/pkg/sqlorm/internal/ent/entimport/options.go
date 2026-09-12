@@ -9,7 +9,7 @@ import (
 	"entgo.io/contrib/schemast"
 	"entgo.io/ent"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm/internal/ent/mux"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 const (
@@ -46,7 +46,7 @@ type (
 		tables         []string
 		excludedTables []string
 		schemaPath     string
-		driver         *mux.ImportDriver
+		driver         *schemasource.Driver
 	}
 
 	// ImportOption allows for managing import configuration using functional options.
@@ -75,7 +75,7 @@ func WithExcludedTables(tables []string) ImportOption {
 }
 
 // WithDriver provides an import driver to be used by SchemaImporter.
-func WithDriver(drv *mux.ImportDriver) ImportOption {
+func WithDriver(drv *schemasource.Driver) ImportOption {
 	return func(i *ImportOptions) {
 		i.driver = drv
 	}

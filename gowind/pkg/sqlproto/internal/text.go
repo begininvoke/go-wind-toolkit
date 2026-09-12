@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
-	"ariga.io/atlas/sql/mysql"
-	"ariga.io/atlas/sql/postgres"
 	"ariga.io/atlas/sql/schema"
-	"ariga.io/atlas/sql/sqlite"
 
 	ddlparser "github.com/tx7do/go-utils/ddl_parser"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 type Text struct {
@@ -25,58 +23,8 @@ func NewText(i *ConvertOptions) (*Text, error) {
 	}, nil
 }
 
-func isFile(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !info.IsDir()
-}
-
-func (t *Text) loadSQLFromFile() string {
-	// 检查 schemaPath 是否为文件
-	if !isFile(t.schemaPath) {
-		// 如果不是文件，去掉可能的 scheme 前缀（如 text://）后返回 SQL 文本内容。
-		return stripScheme(t.schemaPath)
-	}
-
-	content, err := os.ReadFile(t.schemaPath)
-	if err != nil {
-		return ""
-	}
-
-	return string(content)
-}
-
-// stripScheme 去掉 DSN 中的 scheme 前缀（如 text://, file://）
-func stripScheme(path string) string {
-	if idx := strings.Index(path, "://"); idx != -1 {
-		return path[idx+3:]
-	}
-	return path
-}
-
-func (t *Text) ParseType(raw string) (schema.Type, error) {
-	mysqlType, err := mysql.ParseType(raw)
-	if err == nil {
-		return mysqlType, nil
-	}
-
-	postgresType, err := postgres.ParseType(raw)
-	if err == nil {
-		return postgresType, nil
-	}
-
-	sqliteType, err := sqlite.ParseType(raw)
-	if err == nil {
-		return sqliteType, nil
-	}
-
-	return &schema.UnsupportedType{T: raw}, nil
-}
-
 func (t *Text) toColumnType(col ddlparser.ColumnDef, sqlContent string) (*schema.ColumnType, error) {
-	parsedType, err := t.ParseType(col.Type)
+	parsedType, err := schemasource.ParseType(col.Type)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +34,7 @@ func (t *Text) toColumnType(col ddlparser.ColumnDef, sqlContent string) (*schema
 	raw := col.Type
 	if intType, ok := parsedType.(*schema.IntegerType); ok && !intType.Unsigned {
 		if isColumnUnsigned(col.Name, col.Type, sqlContent) {
-			unsignedType, uErr := t.ParseType(col.Type + " unsigned")
+				unsignedType, uErr := schemasource.ParseType(col.Type + " unsigned")
 			if uErr == nil {
 				if uIntType, ok := unsignedType.(*schema.IntegerType); ok && uIntType.Unsigned {
 					parsedType = uIntType
@@ -220,7 +168,7 @@ func (t *Text) InspectSchema(sqlContent string, s *schema.Schema) (*schema.Schem
 
 func (t *Text) SchemaTables(_ context.Context) ([]*TableData, error) {
 	// 加载 SQL 文本
-	sqlText := t.loadSQLFromFile()
+	sqlText := schemasource.LoadSQLFromFile(t.schemaPath)
 	if sqlText == "" {
 		return nil, fmt.Errorf("无法加载 SQL 文件: %v", t.schemaPath)
 	}

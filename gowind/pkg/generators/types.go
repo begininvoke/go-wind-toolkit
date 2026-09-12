@@ -1,8 +1,6 @@
 package generators
 
 import (
-	"context"
-
 	"github.com/tx7do/go-utils/stringcase"
 )
 
@@ -156,22 +154,3 @@ func (f DataField) EntCreateSetFunc() string {
 	}
 	return MakeEntSetFunc(f.Name)
 }
-
-// TableData 表数据
-type TableData struct {
-	Name      string       // 表名
-	Comment   string       // 表注释
-	Charset   string       // 字符集
-	Collation string       // 排序规则
-	Fields    []ProtoField // 字段数据
-}
-
-func (t TableData) WithComment() bool {
-	return t.Comment != ""
-}
-
-type SchemaConverter interface {
-	SchemaTables(context.Context) ([]*TableData, error)
-}
-
-type fieldTypeFunc func(sqlType string) string

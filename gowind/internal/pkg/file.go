@@ -149,6 +149,10 @@ func ReplaceTemplateInCurrentDir(rootDir, source, target string) (int, error) {
 	return updated, err
 }
 
+// IsDirExists 检查路径是否已存在（三态语义：除“明确不存在”外的任何
+// stat 结果——含权限错误——都返回 true）。用于“存在即拒绝”守卫，
+// 宁可误报存在也不放过。与 extract 包的两态 isDirExists 语义不同，
+// 不可互换。
 func IsDirExists(dir string) bool {
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		return true

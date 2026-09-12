@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlproto/internal/mux"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 // TestTextSchemaTables tests parsing SQL text and converting to table data
@@ -21,7 +21,7 @@ func TestTextSchemaTables(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -95,7 +95,7 @@ func TestTextParseMultipleTables(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -131,7 +131,7 @@ func TestTextParseEmptySQL(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -158,7 +158,7 @@ func TestTextParseInvalidSQL(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -198,7 +198,7 @@ func TestTextParseWithExcludedTables(t *testing.T) {
 	opts := &ConvertOptions{
 		schemaPath:     sqlContent,
 		excludedTables: []string{"logs"},
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -262,7 +262,7 @@ func TestTextParseWithIncludedTables(t *testing.T) {
 	opts := &ConvertOptions{
 		schemaPath:     sqlContent,
 		includedTables: []string{"users", "posts"},
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -324,7 +324,7 @@ func TestTextParseComplexDataTypes(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -375,7 +375,7 @@ func TestTextParseWithFieldComments(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -418,7 +418,7 @@ func TestNewConvertWithTextDialect(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},
@@ -463,7 +463,7 @@ func TestTextParseNullableFields(t *testing.T) {
 
 	opts := &ConvertOptions{
 		schemaPath: sqlContent,
-		driver: &mux.ConvertDriver{
+		driver: &schemasource.Driver{
 			Dialect:    "text",
 			SchemaName: "public",
 		},

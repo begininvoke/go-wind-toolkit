@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm/internal/ent/mux"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 func MockMySQLTableNameDoesNotUsePluralForm() *schema.Schema {
@@ -4073,12 +4073,12 @@ func lookupMethod(file *ast.File, typeName string, methodName string) (m *ast.Fu
 	return m
 }
 
-func mockMux(ctx context.Context, dlct string, data *schema.Schema, schemaName string) *mux.Mux {
+func mockMux(ctx context.Context, dlct string, data *schema.Schema, schemaName string) *schemasource.Mux {
 	im := &inspectorMock{}
 	im.On("InspectSchema", ctx, schemaName, &schema.InspectOptions{}).Return(data, nil)
-	m := mux.New()
-	m.RegisterProvider(func(s string) (*mux.ImportDriver, error) {
-		return &mux.ImportDriver{
+	m := schemasource.New()
+	m.RegisterProvider(func(s string) (*schemasource.Driver, error) {
+		return &schemasource.Driver{
 			Inspector:  im,
 			Dialect:    dlct,
 			SchemaName: schemaName,

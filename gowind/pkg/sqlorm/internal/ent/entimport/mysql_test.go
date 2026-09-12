@@ -372,7 +372,7 @@ func TestMySQL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			m := mockMux(ctx, dialect.MySQL, tt.mock, testSchema)
-			drv, err := m.OpenImport("mysql://root:pass@tcp(localhost:3308)/test?parseTime=True")
+			drv, err := m.Open("mysql://root:pass@tcp(localhost:3308)/test?parseTime=True")
 			r.NoError(err)
 			importer, err := entimport.NewImport(
 				entimport.WithDriver(drv),
@@ -420,7 +420,7 @@ func TestMySQLJoinTableOnly(t *testing.T) {
 		ctx        = context.Background()
 	)
 	m := mockMux(ctx, dialect.MySQL, MockMySQLM2MJoinTableOnly(), testSchema)
-	drv, err := m.OpenImport("mysql://root:pass@tcp(localhost:3308)/test?parseTime=True")
+	drv, err := m.Open("mysql://root:pass@tcp(localhost:3308)/test?parseTime=True")
 	require.NoError(t, err)
 	importer, err := entimport.NewImport(
 		entimport.WithDriver(drv),

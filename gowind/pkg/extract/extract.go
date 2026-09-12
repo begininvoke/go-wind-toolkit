@@ -714,7 +714,9 @@ func injectBeforeMarker(content string, marker string, line string) (string, err
 	return content[:idx] + line + "\n" + content[idx:], nil
 }
 
-// isDirExists 检查目录是否存在
+// isDirExists 检查路径是否为已存在的目录（两态语义：stat 出错一律
+// false，且必须确为目录才 true）。用于 ORM schema 目录探测，与
+// internal/pkg.IsDirExists 的三态语义不同，不可互换。
 func isDirExists(path string) bool {
 	fi, err := os.Stat(path)
 	if err != nil {

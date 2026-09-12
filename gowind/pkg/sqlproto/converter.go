@@ -5,10 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"strings"
 
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlproto/internal"
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlproto/internal/mux"
 )
 
 type TableDataArray []*internal.TableData
@@ -37,9 +36,9 @@ func Convert(
 	_ = os.MkdirAll(*outputPath, 0o755)
 
 	// Normalize the DSN to ensure it has a valid scheme
-	normalizedDSN := normalizeDSN(*dsn)
+	normalizedDSN := schemasource.NormalizeDSN(*dsn)
 
-	convertDriver, err := mux.Default.OpenConvert(normalizedDSN)
+	convertDriver, err := schemasource.Default.Open(normalizedDSN)
 	if err != nil {
 		return nil, fmt.Errorf("sqlproto: failed to create import driver: %w", err)
 	}
@@ -78,23 +77,4 @@ func Convert(
 	}
 
 	return tableDatas, nil
-}
-
-// normalizeDSN normalizes the DSN to ensure it has a valid scheme.
-// If it already has a scheme (mysql://, postgres://, etc.), it's returned as-is.
-// If it's a file path, it will be prefixed with "file://".
-// Otherwise, it's treated as SQL text content and prefixed with "text://".
-func normalizeDSN(dsn string) string {
-	// Check if it already has a scheme
-	if strings.Contains(dsn, "://") {
-		return dsn
-	}
-
-	// Check if it's a file path
-	if _, err := os.Stat(dsn); err == nil {
-		return "file://" + dsn
-	}
-
-	// Treat it as SQL text content
-	return "text://" + dsn
 }

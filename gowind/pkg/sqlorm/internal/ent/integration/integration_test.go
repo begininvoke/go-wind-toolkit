@@ -21,8 +21,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm/internal/ent/entimport"
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlorm/internal/ent/mux"
 )
 
 func TestMySQL(t *testing.T) {
@@ -529,7 +529,7 @@ create table user_groups
 	r.NoError(err)
 	defer db.Close()
 	r.NoError(db.Ping())
-	drv, err := mux.Default.OpenImport("mysql://" + dsn)
+	drv, err := schemasource.Default.Open("mysql://" + dsn)
 	r.NoError(err)
 	defer drv.Close()
 	si, err := entimport.NewImport(
@@ -1110,7 +1110,7 @@ create table user_groups
 	r.NoError(err)
 	defer db.Close()
 	r.NoError(db.Ping())
-	drv, err := mux.Default.OpenImport(dsn)
+	drv, err := schemasource.Default.Open(dsn)
 	r.NoError(err)
 	defer drv.Close()
 	si, err := entimport.NewImport(

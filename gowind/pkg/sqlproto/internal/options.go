@@ -1,7 +1,7 @@
 package internal
 
 import (
-	"github.com/tx7do/go-wind-toolkit/gowind/pkg/sqlproto/internal/mux"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 type Options struct {
@@ -34,7 +34,7 @@ type (
 
 		serviceType string
 
-		driver *mux.ConvertDriver
+		driver *schemasource.Driver
 	}
 
 	// ConvertOption allows for managing import configuration using functional options.
@@ -93,7 +93,7 @@ func WithExcludedTables(tables []string) ConvertOption {
 }
 
 // WithDriver provides an import driver to be used by SchemaConverter.
-func WithDriver(drv *mux.ConvertDriver) ConvertOption {
+func WithDriver(drv *schemasource.Driver) ConvertOption {
 	return func(i *ConvertOptions) {
 		i.driver = drv
 	}

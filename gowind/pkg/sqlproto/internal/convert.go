@@ -5,12 +5,13 @@ import (
 	"log"
 	"strings"
 
-	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 
 	"ariga.io/atlas/sql/schema"
 
 	_ "github.com/lib/pq"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/schemasource"
 )
 
 func NewConvert(opts ...ConvertOption) (SchemaConverter, error) {
@@ -49,39 +50,11 @@ func NewConvert(opts ...ConvertOption) (SchemaConverter, error) {
 	return si, err
 }
 
-// applyColumnAttributes adds column attributes to a given ent field.
-func applyColumnAttributes(f ent.Field, col *schema.Column) {
-	desc := f.Descriptor()
-	desc.Optional = col.Type.Null
-	for _, attr := range col.Attrs {
-		if a, ok := attr.(*schema.Comment); ok {
-			desc.Comment = a.Text
-		}
-	}
-}
-
-// Note: at this moment ent doesn't support fields on m2m relations.
-func isJoinTable(table *schema.Table) bool {
-	if table.PrimaryKey == nil || len(table.PrimaryKey.Parts) != 2 || len(table.ForeignKeys) != 2 {
-		return false
-	}
-	// Make sure that the foreign key columns exactly match primary key column.
-	for _, fk := range table.ForeignKeys {
-		if len(fk.Columns) != 1 {
-			return false
-		}
-		if fk.Columns[0] != table.PrimaryKey.Parts[0].C && fk.Columns[0] != table.PrimaryKey.Parts[1].C {
-			return false
-		}
-	}
-	return true
-}
-
 func schemaTables(fnc fieldTypeFunc, tables []*schema.Table) ([]*TableData, error) {
 	tableDatas := make([]*TableData, 0)
 	joinTables := make(map[string]*schema.Table)
 	for _, table := range tables {
-		if isJoinTable(table) {
+		if schemasource.IsJoinTable(table) {
 			joinTables[table.Name] = table
 			continue
 		}

@@ -13,9 +13,13 @@ export function AIGenerateBackendCode(arg1:string,arg2:string,arg3:Array<ai.Micr
 
 export function AIGenerateDDL(arg1:string):Promise<ai.StepResult>;
 
+export function AIGenerateDDLStream(arg1:string):Promise<ai.StepResult>;
+
 export function AIPartitionMicroservices(arg1:string):Promise<ai.PartitionResult>;
 
 export function AIReviewCode(arg1:Record<string, string>):Promise<ai.StepResult>;
+
+export function AIReviewCodeStream(arg1:Record<string, string>):Promise<ai.StepResult>;
 
 export function AddService(arg1:devtools.AddServiceOptions):Promise<devtools.CommandResult>;
 

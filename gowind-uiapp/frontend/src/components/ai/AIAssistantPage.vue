@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, reactive, computed} from 'vue'
+import {ref, reactive, computed, onMounted, onUnmounted} from 'vue'
 import {message, Modal} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
@@ -19,15 +19,16 @@ import {
   SetAIConfig,
   GetAIProviderPresets,
   TestAIConnection,
-  AIGenerateDDL,
+  AIGenerateDDLStream,
   AIPartitionMicroservices,
   AIGenerateBackendCode,
   AIFindOpenAPIFiles,
-  AIReviewCode,
+  AIReviewCodeStream,
   OpenProject,
   SelectFolder,
   GetProjectInfo,
 } from '../../../wailsjs/go/main/App'
+import {EventsOn, EventsOff} from '../../../wailsjs/runtime'
 import type {ai} from '../../../wailsjs/go/models'
 
 import MonacoEditor from '../backend/MonacoEditor.vue'
@@ -156,8 +157,9 @@ async function handleGenerateDDL() {
   }
 
   ddlGenerating.value = true
+  ddlContent.value = ''
   try {
-    const result = await AIGenerateDDL(requirements.value)
+    const result = await AIGenerateDDLStream(requirements.value)
     if (result.success) {
       ddlContent.value = result.content
       message.success(t('ai.ddl.generateSuccess'))
@@ -277,8 +279,9 @@ async function handleReview() {
   }
 
   reviewLoading.value = true
+  reviewResult.value = ''
   try {
-    const result = await AIReviewCode(reviewFileContents)
+    const result = await AIReviewCodeStream(reviewFileContents)
     if (result.success) {
       reviewResult.value = result.content
       message.success(t('ai.review.success'))
@@ -324,6 +327,25 @@ function canNext(): boolean {
       return false
   }
 }
+
+// ==================== 流式输出监听 ====================
+// "ai:stream" 逐块推送生成内容实现实时进度;结束状态仍由方法返回值权威处理。
+function onAIStream(data: any) {
+  if (!data || typeof data.delta !== 'string') return
+  if (data.task === 'ddl' && ddlGenerating.value) {
+    ddlContent.value += data.delta
+  } else if (data.task === 'review' && reviewLoading.value) {
+    reviewResult.value += data.delta
+  }
+}
+
+onMounted(() => {
+  EventsOn('ai:stream', onAIStream)
+})
+
+onUnmounted(() => {
+  EventsOff('ai:stream')
+})
 
 // 初始化
 loadAIConfig()

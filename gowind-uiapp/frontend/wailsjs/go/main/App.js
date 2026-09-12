@@ -14,12 +14,20 @@ export function AIGenerateDDL(arg1) {
   return window['go']['main']['App']['AIGenerateDDL'](arg1);
 }
 
+export function AIGenerateDDLStream(arg1) {
+  return window['go']['main']['App']['AIGenerateDDLStream'](arg1);
+}
+
 export function AIPartitionMicroservices(arg1) {
   return window['go']['main']['App']['AIPartitionMicroservices'](arg1);
 }
 
 export function AIReviewCode(arg1) {
   return window['go']['main']['App']['AIReviewCode'](arg1);
+}
+
+export function AIReviewCodeStream(arg1) {
+  return window['go']['main']['App']['AIReviewCodeStream'](arg1);
 }
 
 export function AddService(arg1) {

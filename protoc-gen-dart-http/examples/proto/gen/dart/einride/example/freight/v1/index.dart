@@ -4,7 +4,9 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import '../../../../transport.dart';
+import '../../../../proto_wire.dart';
 
 const defaultHost = 'freight-example.einride.tech';
 
@@ -177,6 +179,176 @@ class Shipment {
       updateTime: updateTime ?? this.updateTime,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: createTime
+    final f2 = createTime;
+    if (f2 != null) {
+      w.writeTimestamp(2, f2);
+    }
+    // field 3: updateTime
+    final f3 = updateTime;
+    if (f3 != null) {
+      w.writeTimestamp(3, f3);
+    }
+    // field 4: deleteTime
+    final f4 = deleteTime;
+    if (f4 != null) {
+      w.writeTimestamp(4, f4);
+    }
+    // field 5: originSite
+    final f5 = originSite;
+    if (f5 != null) {
+      w.writeString(5, f5);
+    }
+    // field 6: destinationSite
+    final f6 = destinationSite;
+    if (f6 != null) {
+      w.writeString(6, f6);
+    }
+    // field 7: pickupEarliestTime
+    final f7 = pickupEarliestTime;
+    if (f7 != null) {
+      w.writeTimestamp(7, f7);
+    }
+    // field 8: pickupLatestTime
+    final f8 = pickupLatestTime;
+    if (f8 != null) {
+      w.writeTimestamp(8, f8);
+    }
+    // field 9: deliveryEarliestTime
+    final f9 = deliveryEarliestTime;
+    if (f9 != null) {
+      w.writeTimestamp(9, f9);
+    }
+    // field 10: deliveryLatestTime
+    final f10 = deliveryLatestTime;
+    if (f10 != null) {
+      w.writeTimestamp(10, f10);
+    }
+    // field 11: lineItems
+    final f11 = lineItems;
+    if (f11 != null) {
+      for (final e in f11) { final cw = ProtoWireWriter(); e._writeTo(cw); w.writeRaw(11, cw.toBuffer()); }
+    }
+    // field 12: annotations
+    final f12 = annotations;
+    if (f12 != null) {
+      f12.forEach((k, v) {
+        final ew = ProtoWireWriter();
+        ew.writeString(1, k);
+        ew.writeString(2, v);
+        w.writeRaw(12, ew.toBuffer());
+      });
+    }
+  }
+
+  factory Shipment.fromBuffer(List<int> bytes) {
+    return Shipment._readFrom(ProtoWireReader(bytes));
+  }
+
+  static Shipment _readFrom(ProtoWireReader r) {
+    final m = Shipment();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        // field 2: createTime
+        case 2: {
+          m.createTime = r.readTimestampIso();
+          break;
+        }
+        // field 3: updateTime
+        case 3: {
+          m.updateTime = r.readTimestampIso();
+          break;
+        }
+        // field 4: deleteTime
+        case 4: {
+          m.deleteTime = r.readTimestampIso();
+          break;
+        }
+        // field 5: originSite
+        case 5: {
+          m.originSite = r.readString();
+          break;
+        }
+        // field 6: destinationSite
+        case 6: {
+          m.destinationSite = r.readString();
+          break;
+        }
+        // field 7: pickupEarliestTime
+        case 7: {
+          m.pickupEarliestTime = r.readTimestampIso();
+          break;
+        }
+        // field 8: pickupLatestTime
+        case 8: {
+          m.pickupLatestTime = r.readTimestampIso();
+          break;
+        }
+        // field 9: deliveryEarliestTime
+        case 9: {
+          m.deliveryEarliestTime = r.readTimestampIso();
+          break;
+        }
+        // field 10: deliveryLatestTime
+        case 10: {
+          m.deliveryLatestTime = r.readTimestampIso();
+          break;
+        }
+        // field 11: lineItems
+        case 11: {
+          m.lineItems = r.readNestedList().map(LineItem._readFrom).toList();
+          break;
+        }
+        // field 12: annotations
+        case 12: {
+          final er = r.readNested();
+          String? k;
+          String? v;
+          while (er.next()) {
+            switch (er.fieldNumber) {
+              case 1: {
+                k = er.readString();
+                break;
+              }
+              case 2: {
+                v = er.readString();
+                break;
+              }
+              default: er.skip();
+            }
+          }
+          if (k != null && v != null) {
+            (m.annotations ??= {})[k] = v;
+          }
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Well-known type: Timestamp
@@ -256,6 +428,73 @@ class LineItem {
       weightKg: weightKg ?? this.weightKg,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: title
+    final f1 = title;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: quantity
+    final f2 = quantity;
+    if (f2 != null) {
+      w.writeFloat(2, f2);
+    }
+    // field 3: weightKg
+    final f3 = weightKg;
+    if (f3 != null) {
+      w.writeFloat(3, f3);
+    }
+    // field 4: volumeM3
+    final f4 = volumeM3;
+    if (f4 != null) {
+      w.writeFloat(4, f4);
+    }
+  }
+
+  factory LineItem.fromBuffer(List<int> bytes) {
+    return LineItem._readFrom(ProtoWireReader(bytes));
+  }
+
+  static LineItem _readFrom(ProtoWireReader r) {
+    final m = LineItem();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: title
+        case 1: {
+          m.title = r.readString();
+          break;
+        }
+        // field 2: quantity
+        case 2: {
+          m.quantity = r.readFloat();
+          break;
+        }
+        // field 3: weightKg
+        case 3: {
+          m.weightKg = r.readFloat();
+          break;
+        }
+        // field 4: volumeM3
+        case 4: {
+          m.volumeM3 = r.readFloat();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// A shipper is a supplier or owner of goods to be transported.
@@ -350,6 +589,83 @@ class Shipper {
       updateTime: updateTime ?? this.updateTime,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: createTime
+    final f2 = createTime;
+    if (f2 != null) {
+      w.writeTimestamp(2, f2);
+    }
+    // field 3: updateTime
+    final f3 = updateTime;
+    if (f3 != null) {
+      w.writeTimestamp(3, f3);
+    }
+    // field 4: deleteTime
+    final f4 = deleteTime;
+    if (f4 != null) {
+      w.writeTimestamp(4, f4);
+    }
+    // field 5: displayName
+    final f5 = displayName;
+    if (f5 != null) {
+      w.writeString(5, f5);
+    }
+  }
+
+  factory Shipper.fromBuffer(List<int> bytes) {
+    return Shipper._readFrom(ProtoWireReader(bytes));
+  }
+
+  static Shipper _readFrom(ProtoWireReader r) {
+    final m = Shipper();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        // field 2: createTime
+        case 2: {
+          m.createTime = r.readTimestampIso();
+          break;
+        }
+        // field 3: updateTime
+        case 3: {
+          m.updateTime = r.readTimestampIso();
+          break;
+        }
+        // field 4: deleteTime
+        case 4: {
+          m.deleteTime = r.readTimestampIso();
+          break;
+        }
+        // field 5: displayName
+        case 5: {
+          m.displayName = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// A site is a node in a [shipper][einride.example.freight.v1.Shipper]'s
@@ -454,6 +770,92 @@ class Site {
       updateTime: updateTime ?? this.updateTime,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: createTime
+    final f2 = createTime;
+    if (f2 != null) {
+      w.writeTimestamp(2, f2);
+    }
+    // field 3: updateTime
+    final f3 = updateTime;
+    if (f3 != null) {
+      w.writeTimestamp(3, f3);
+    }
+    // field 4: deleteTime
+    final f4 = deleteTime;
+    if (f4 != null) {
+      w.writeTimestamp(4, f4);
+    }
+    // field 5: displayName
+    final f5 = displayName;
+    if (f5 != null) {
+      w.writeString(5, f5);
+    }
+    // field 6: latLng
+    final f6 = latLng;
+    if (f6 != null) {
+      throw UnsupportedError('dart-http wire: google.type.LatLng not supported');
+    }
+  }
+
+  factory Site.fromBuffer(List<int> bytes) {
+    return Site._readFrom(ProtoWireReader(bytes));
+  }
+
+  static Site _readFrom(ProtoWireReader r) {
+    final m = Site();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        // field 2: createTime
+        case 2: {
+          m.createTime = r.readTimestampIso();
+          break;
+        }
+        // field 3: updateTime
+        case 3: {
+          m.updateTime = r.readTimestampIso();
+          break;
+        }
+        // field 4: deleteTime
+        case 4: {
+          m.deleteTime = r.readTimestampIso();
+          break;
+        }
+        // field 5: displayName
+        case 5: {
+          m.displayName = r.readString();
+          break;
+        }
+        // field 6: latLng
+        case 6: {
+          throw UnsupportedError('dart-http wire: google.type.LatLng not supported');
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Well-known type: LatLng
@@ -509,6 +911,43 @@ class GetShipperRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory GetShipperRequest.fromBuffer(List<int> bytes) {
+    return GetShipperRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static GetShipperRequest _readFrom(ProtoWireReader r) {
+    final m = GetShipperRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.ListShippers.
@@ -570,6 +1009,53 @@ class ListShippersRequest {
       pageToken: pageToken ?? this.pageToken,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: pageSize
+    final f1 = pageSize;
+    if (f1 != null) {
+      w.writeInt32(1, f1);
+    }
+    // field 2: pageToken
+    final f2 = pageToken;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+  }
+
+  factory ListShippersRequest.fromBuffer(List<int> bytes) {
+    return ListShippersRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListShippersRequest _readFrom(ProtoWireReader r) {
+    final m = ListShippersRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: pageSize
+        case 1: {
+          m.pageSize = r.readInt32();
+          break;
+        }
+        // field 2: pageToken
+        case 2: {
+          m.pageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Response message for FreightService.ListShippers.
@@ -630,6 +1116,53 @@ class ListShippersResponse {
       shippers: shippers ?? this.shippers,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: shippers
+    final f1 = shippers;
+    if (f1 != null) {
+      for (final e in f1) { final cw = ProtoWireWriter(); e._writeTo(cw); w.writeRaw(1, cw.toBuffer()); }
+    }
+    // field 2: nextPageToken
+    final f2 = nextPageToken;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+  }
+
+  factory ListShippersResponse.fromBuffer(List<int> bytes) {
+    return ListShippersResponse._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListShippersResponse _readFrom(ProtoWireReader r) {
+    final m = ListShippersResponse();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: shippers
+        case 1: {
+          m.shippers = r.readNestedList().map(Shipper._readFrom).toList();
+          break;
+        }
+        // field 2: nextPageToken
+        case 2: {
+          m.nextPageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.CreateShipper.
@@ -680,6 +1213,43 @@ class CreateShipperRequest {
       shipper: shipper ?? this.shipper,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: shipper
+    final f1 = shipper;
+    if (f1 != null) {
+      final cw = ProtoWireWriter(); f1._writeTo(cw); w.writeRaw(1, cw.toBuffer()); // Shipper
+    }
+  }
+
+  factory CreateShipperRequest.fromBuffer(List<int> bytes) {
+    return CreateShipperRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static CreateShipperRequest _readFrom(ProtoWireReader r) {
+    final m = CreateShipperRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: shipper
+        case 1: {
+          m.shipper = Shipper._readFrom(r.readNested());
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.UpdateShipper.
@@ -741,6 +1311,53 @@ class UpdateShipperRequest {
       updateMask: updateMask ?? this.updateMask,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: shipper
+    final f1 = shipper;
+    if (f1 != null) {
+      final cw = ProtoWireWriter(); f1._writeTo(cw); w.writeRaw(1, cw.toBuffer()); // Shipper
+    }
+    // field 2: updateMask
+    final f2 = updateMask;
+    if (f2 != null) {
+      w.writeFieldMask(2, f2);
+    }
+  }
+
+  factory UpdateShipperRequest.fromBuffer(List<int> bytes) {
+    return UpdateShipperRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static UpdateShipperRequest _readFrom(ProtoWireReader r) {
+    final m = UpdateShipperRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: shipper
+        case 1: {
+          m.shipper = Shipper._readFrom(r.readNested());
+          break;
+        }
+        // field 2: updateMask
+        case 2: {
+          m.updateMask = r.readFieldMaskText();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Well-known type: FieldMask
@@ -796,6 +1413,43 @@ class DeleteShipperRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory DeleteShipperRequest.fromBuffer(List<int> bytes) {
+    return DeleteShipperRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static DeleteShipperRequest _readFrom(ProtoWireReader r) {
+    final m = DeleteShipperRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.GetSite.
@@ -847,6 +1501,43 @@ class GetSiteRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory GetSiteRequest.fromBuffer(List<int> bytes) {
+    return GetSiteRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static GetSiteRequest _readFrom(ProtoWireReader r) {
+    final m = GetSiteRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.ListSites.
@@ -920,6 +1611,63 @@ class ListSitesRequest {
       parent: parent ?? this.parent,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: parent
+    final f1 = parent;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: pageSize
+    final f2 = pageSize;
+    if (f2 != null) {
+      w.writeInt32(2, f2);
+    }
+    // field 3: pageToken
+    final f3 = pageToken;
+    if (f3 != null) {
+      w.writeString(3, f3);
+    }
+  }
+
+  factory ListSitesRequest.fromBuffer(List<int> bytes) {
+    return ListSitesRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListSitesRequest _readFrom(ProtoWireReader r) {
+    final m = ListSitesRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: parent
+        case 1: {
+          m.parent = r.readString();
+          break;
+        }
+        // field 2: pageSize
+        case 2: {
+          m.pageSize = r.readInt32();
+          break;
+        }
+        // field 3: pageToken
+        case 3: {
+          m.pageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Response message for FreightService.ListSites.
@@ -980,6 +1728,53 @@ class ListSitesResponse {
       sites: sites ?? this.sites,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: sites
+    final f1 = sites;
+    if (f1 != null) {
+      for (final e in f1) { final cw = ProtoWireWriter(); e._writeTo(cw); w.writeRaw(1, cw.toBuffer()); }
+    }
+    // field 2: nextPageToken
+    final f2 = nextPageToken;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+  }
+
+  factory ListSitesResponse.fromBuffer(List<int> bytes) {
+    return ListSitesResponse._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListSitesResponse _readFrom(ProtoWireReader r) {
+    final m = ListSitesResponse();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: sites
+        case 1: {
+          m.sites = r.readNestedList().map(Site._readFrom).toList();
+          break;
+        }
+        // field 2: nextPageToken
+        case 2: {
+          m.nextPageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.CreateSite.
@@ -1042,6 +1837,53 @@ class CreateSiteRequest {
       site: site ?? this.site,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: parent
+    final f1 = parent;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: site
+    final f2 = site;
+    if (f2 != null) {
+      final cw = ProtoWireWriter(); f2._writeTo(cw); w.writeRaw(2, cw.toBuffer()); // Site
+    }
+  }
+
+  factory CreateSiteRequest.fromBuffer(List<int> bytes) {
+    return CreateSiteRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static CreateSiteRequest _readFrom(ProtoWireReader r) {
+    final m = CreateSiteRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: parent
+        case 1: {
+          m.parent = r.readString();
+          break;
+        }
+        // field 2: site
+        case 2: {
+          m.site = Site._readFrom(r.readNested());
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.UpdateSite.
@@ -1103,6 +1945,53 @@ class UpdateSiteRequest {
       updateMask: updateMask ?? this.updateMask,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: site
+    final f1 = site;
+    if (f1 != null) {
+      final cw = ProtoWireWriter(); f1._writeTo(cw); w.writeRaw(1, cw.toBuffer()); // Site
+    }
+    // field 2: updateMask
+    final f2 = updateMask;
+    if (f2 != null) {
+      w.writeFieldMask(2, f2);
+    }
+  }
+
+  factory UpdateSiteRequest.fromBuffer(List<int> bytes) {
+    return UpdateSiteRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static UpdateSiteRequest _readFrom(ProtoWireReader r) {
+    final m = UpdateSiteRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: site
+        case 1: {
+          m.site = Site._readFrom(r.readNested());
+          break;
+        }
+        // field 2: updateMask
+        case 2: {
+          m.updateMask = r.readFieldMaskText();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.DeleteSite.
@@ -1154,6 +2043,43 @@ class DeleteSiteRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory DeleteSiteRequest.fromBuffer(List<int> bytes) {
+    return DeleteSiteRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static DeleteSiteRequest _readFrom(ProtoWireReader r) {
+    final m = DeleteSiteRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.GetShipment.
@@ -1205,6 +2131,43 @@ class GetShipmentRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory GetShipmentRequest.fromBuffer(List<int> bytes) {
+    return GetShipmentRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static GetShipmentRequest _readFrom(ProtoWireReader r) {
+    final m = GetShipmentRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.ListShipments.
@@ -1278,6 +2241,63 @@ class ListShipmentsRequest {
       parent: parent ?? this.parent,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: parent
+    final f1 = parent;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: pageSize
+    final f2 = pageSize;
+    if (f2 != null) {
+      w.writeInt32(2, f2);
+    }
+    // field 3: pageToken
+    final f3 = pageToken;
+    if (f3 != null) {
+      w.writeString(3, f3);
+    }
+  }
+
+  factory ListShipmentsRequest.fromBuffer(List<int> bytes) {
+    return ListShipmentsRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListShipmentsRequest _readFrom(ProtoWireReader r) {
+    final m = ListShipmentsRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: parent
+        case 1: {
+          m.parent = r.readString();
+          break;
+        }
+        // field 2: pageSize
+        case 2: {
+          m.pageSize = r.readInt32();
+          break;
+        }
+        // field 3: pageToken
+        case 3: {
+          m.pageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Response message for FreightService.ListShipments.
@@ -1338,6 +2358,53 @@ class ListShipmentsResponse {
       shipments: shipments ?? this.shipments,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: shipments
+    final f1 = shipments;
+    if (f1 != null) {
+      for (final e in f1) { final cw = ProtoWireWriter(); e._writeTo(cw); w.writeRaw(1, cw.toBuffer()); }
+    }
+    // field 2: nextPageToken
+    final f2 = nextPageToken;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+  }
+
+  factory ListShipmentsResponse.fromBuffer(List<int> bytes) {
+    return ListShipmentsResponse._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListShipmentsResponse _readFrom(ProtoWireReader r) {
+    final m = ListShipmentsResponse();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: shipments
+        case 1: {
+          m.shipments = r.readNestedList().map(Shipment._readFrom).toList();
+          break;
+        }
+        // field 2: nextPageToken
+        case 2: {
+          m.nextPageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.CreateShipment.
@@ -1400,6 +2467,53 @@ class CreateShipmentRequest {
       shipment: shipment ?? this.shipment,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: parent
+    final f1 = parent;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: shipment
+    final f2 = shipment;
+    if (f2 != null) {
+      final cw = ProtoWireWriter(); f2._writeTo(cw); w.writeRaw(2, cw.toBuffer()); // Shipment
+    }
+  }
+
+  factory CreateShipmentRequest.fromBuffer(List<int> bytes) {
+    return CreateShipmentRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static CreateShipmentRequest _readFrom(ProtoWireReader r) {
+    final m = CreateShipmentRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: parent
+        case 1: {
+          m.parent = r.readString();
+          break;
+        }
+        // field 2: shipment
+        case 2: {
+          m.shipment = Shipment._readFrom(r.readNested());
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.UpdateShipment.
@@ -1461,6 +2575,53 @@ class UpdateShipmentRequest {
       updateMask: updateMask ?? this.updateMask,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: shipment
+    final f1 = shipment;
+    if (f1 != null) {
+      final cw = ProtoWireWriter(); f1._writeTo(cw); w.writeRaw(1, cw.toBuffer()); // Shipment
+    }
+    // field 2: updateMask
+    final f2 = updateMask;
+    if (f2 != null) {
+      w.writeFieldMask(2, f2);
+    }
+  }
+
+  factory UpdateShipmentRequest.fromBuffer(List<int> bytes) {
+    return UpdateShipmentRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static UpdateShipmentRequest _readFrom(ProtoWireReader r) {
+    final m = UpdateShipmentRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: shipment
+        case 1: {
+          m.shipment = Shipment._readFrom(r.readNested());
+          break;
+        }
+        // field 2: updateMask
+        case 2: {
+          m.updateMask = r.readFieldMaskText();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for FreightService.DeleteShipment.
@@ -1512,6 +2673,43 @@ class DeleteShipmentRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory DeleteShipmentRequest.fromBuffer(List<int> bytes) {
+    return DeleteShipmentRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static DeleteShipmentRequest _readFrom(ProtoWireReader r) {
+    final m = DeleteShipmentRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// This API represents a simple freight service.

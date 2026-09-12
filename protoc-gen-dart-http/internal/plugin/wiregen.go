@@ -30,18 +30,24 @@ func wireFields(message protoreflect.MessageDescriptor) []protoreflect.FieldDesc
 	return fields
 }
 
+// wireGuard 生成字段写出的空值守卫：先拷贝到局部变量再判空（局部变量判空
+// 后类型已提升，表达式内不需要也不应该再写 !）。字段缺位时整体跳过写出。
+func wireGuard(n int, fname, expr string) []string {
+	return []string{
+		"final f" + fmt.Sprint(n) + " = " + fname + ";",
+		"if (f" + fmt.Sprint(n) + " != null) {",
+		"  " + expr,
+		"}",
+	}
+}
+
 // wireWriteStmts 返回 _writeTo 内单个字段的写出语句块。
 func wireWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescriptor) []string {
 	fname := dartFieldName(field.JSONName())
 	n := int(field.Number())
 
 	guard := func(expr string) []string {
-		return []string{
-			"final f" + fmt.Sprint(n) + " = " + fname + ";",
-			"if (f" + fmt.Sprint(n) + " != null) {",
-			"  " + expr,
-			"}",
-		}
+		return wireGuard(n, fname, expr)
 	}
 
 	switch {
@@ -52,30 +58,43 @@ func wireWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescripto
 		if fieldCategoryOf(field) == categoryScalar && field.Kind() == protoreflect.MessageKind {
 			// repeated WKT 标量（如 repeated Timestamp）
 			wkt := mustWellKnown(field.Message())
-			return guard("for (final e in f" + fmt.Sprint(n) + "!) {" +
-				" " + wkt.wireWriteCall(pkg, n, "e") + " }")
+			if !wkt.isWireSupported() {
+				return guard(wkt.wireUnsupportedStmt())
+			}
+			// 元素无关的 WKT（如 Empty）用 _ 通配，避免未使用变量。
+			loopVar := "e"
+			if !wkt.wireWriteUsesElement() {
+				loopVar = "_"
+			}
+			return guard("for (final " + loopVar + " in f" + fmt.Sprint(n) + ") {" +
+				" " + wkt.wireWriteCall(pkg, n, loopVar) + " }")
 		}
 		switch field.Kind() {
 		case protoreflect.MessageKind:
-			return guard("for (final e in f" + fmt.Sprint(n) + "!) {" +
+			return guard("for (final e in f" + fmt.Sprint(n) + ") {" +
 				" final cw = ProtoWireWriter(); e._writeTo(cw); w.writeRaw(" + fmt.Sprint(n) + ", cw.toBuffer()); }")
 		case protoreflect.StringKind:
-			return guard("w.writeStringList(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + "!);")
+			return guard("w.writeStringList(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + ");")
 		case protoreflect.BytesKind:
-			return guard("w.writeBytesList(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + "!);")
+			return guard("w.writeBytesList(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + ");")
 		case protoreflect.EnumKind:
+			// WKT 枚举（NullValue/DayOfWeek/Month）映射为 String，无 wire 枚举可写。
+			if wkt, ok := WellKnownType(field.Enum()); ok {
+				return guard(wkt.wireUnsupportedStmt())
+			}
 			enumName := namedTypeFromField(pkg, field).Name
 			return guard("w.writePackedVarintList(" + fmt.Sprint(n) +
-				", f" + fmt.Sprint(n) + "!.map((e) => e.wire).toList());" +
+				", f" + fmt.Sprint(n) + ".map((e) => e.wire).toList());" +
 				" // " + enumName)
 		default:
 			if m := wirePackedWriter(field.Kind()); m != "" {
 				if field.Kind() == protoreflect.FloatKind || field.Kind() == protoreflect.DoubleKind {
-					return guard("w." + m + "(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + "!);")
+					return guard("w." + m + "(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + ");")
 				}
-				return guard("w." + m + "(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + "!);")
+				return guard("w." + m + "(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + ");")
 			}
-			return []string{"throw UnsupportedError('dart-http wire: list field " + string(field.FullName()) + "');"}
+			// 不支持的打包列表：仅在字段实际出现时抛错，缺位时其余字段仍可编码。
+			return guard("throw UnsupportedError('dart-http wire: list field " + string(field.FullName()) + "');")
 		}
 
 	default:
@@ -83,19 +102,24 @@ func wireWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescripto
 		case protoreflect.MessageKind:
 			if IsWellKnownType(field.Message()) {
 				wkt := mustWellKnown(field.Message())
-				return guard(wkt.wireWriteCall(pkg, n, "f"+fmt.Sprint(n)+"!"))
+				return guard(wkt.wireWriteCall(pkg, n, "f"+fmt.Sprint(n)))
 			}
 			typ := namedTypeFromField(pkg, field).Name
-			return guard("final cw = ProtoWireWriter(); f" + fmt.Sprint(n) + "!._writeTo(cw); w.writeRaw(" + fmt.Sprint(n) + ", cw.toBuffer()); // " + typ)
+			return guard("final cw = ProtoWireWriter(); f" + fmt.Sprint(n) + "._writeTo(cw); w.writeRaw(" + fmt.Sprint(n) + ", cw.toBuffer()); // " + typ)
 		case protoreflect.EnumKind:
+			// WKT 枚举（NullValue/DayOfWeek/Month）映射为 String，无 wire 枚举可写。
+			if wkt, ok := WellKnownType(field.Enum()); ok {
+				return guard(wkt.wireUnsupportedStmt())
+			}
 			enumName := namedTypeFromField(pkg, field).Name
-			return guard("w.writeEnum(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + "!.wire); // " + enumName)
+			return guard("w.writeEnum(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + ".wire); // " + enumName)
 		default:
 			m := wireScalarWriter(field.Kind())
 			if m == "" {
-				return []string{"throw UnsupportedError('dart-http wire: field " + string(field.FullName()) + "');"}
+				// 不支持的字段：仅在字段实际出现时抛错，缺位时其余字段仍可编码。
+				return guard("throw UnsupportedError('dart-http wire: field " + string(field.FullName()) + "');")
 			}
-			return guard("w." + m + "(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + "!);")
+			return guard("w." + m + "(" + fmt.Sprint(n) + ", f" + fmt.Sprint(n) + ");")
 		}
 	}
 }
@@ -106,7 +130,6 @@ func wireReadCaseStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	fname := dartFieldName(field.JSONName())
 	n := int(field.Number())
 	head := "case " + fmt.Sprint(n) + ": {"
-	tail := []string{"  break;", "}"}
 
 	var body []string
 
@@ -117,6 +140,10 @@ func wireReadCaseStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	case field.IsList():
 		if fieldCategoryOf(field) == categoryScalar && field.Kind() == protoreflect.MessageKind {
 			wkt := mustWellKnown(field.Message())
+			if !wkt.isWireSupported() {
+				body = []string{wkt.wireUnsupportedStmt()}
+				break
+			}
 			body = []string{"m." + fname + " = r.readNestedList().map((er) => " +
 				wkt.wireReadExpr(pkg, "er") + ").toList();"}
 		}
@@ -130,6 +157,11 @@ func wireReadCaseStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 			case protoreflect.BytesKind:
 				body = []string{"m." + fname + " = r.readBytesListText();"}
 			case protoreflect.EnumKind:
+				// WKT 枚举（NullValue/DayOfWeek/Month）映射为 String，无 wire 枚举可读。
+				if wkt, ok := WellKnownType(field.Enum()); ok {
+					body = []string{wkt.wireUnsupportedStmt()}
+					break
+				}
 				enumName := namedTypeFromField(pkg, field).Name
 				body = []string{"m." + fname + " = r.readVarintList().map(" + enumName + ".fromWire).toList();"}
 			default:
@@ -147,12 +179,21 @@ func wireReadCaseStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 		case protoreflect.MessageKind:
 			if IsWellKnownType(field.Message()) {
 				wkt := mustWellKnown(field.Message())
+				if !wkt.isWireSupported() {
+					body = []string{wkt.wireUnsupportedStmt()}
+					break
+				}
 				body = []string{"m." + fname + " = " + wkt.wireReadExpr(pkg, "r") + ";"}
 			} else {
 				typ := namedTypeFromField(pkg, field).Name
 				body = []string{"m." + fname + " = " + typ + "._readFrom(r.readNested());"}
 			}
 		case protoreflect.EnumKind:
+			// WKT 枚举（NullValue/DayOfWeek/Month）映射为 String，无 wire 枚举可读。
+			if wkt, ok := WellKnownType(field.Enum()); ok {
+				body = []string{wkt.wireUnsupportedStmt()}
+				break
+			}
 			enumName := namedTypeFromField(pkg, field).Name
 			body = []string{"m." + fname + " = " + enumName + ".fromWire(r.readEnum());"}
 		default:
@@ -169,7 +210,12 @@ func wireReadCaseStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	for _, line := range body {
 		out = append(out, "  "+line)
 	}
-	out = append(out, tail...)
+	// 纯 throw 的 case 不再补 break（throw 之后的 break 永远不可达，
+	// 会被分析器标为 dead code）。
+	if !(len(body) == 1 && strings.HasPrefix(body[0], "throw ")) {
+		out = append(out, "  break;")
+	}
+	out = append(out, "}")
 	return out
 }
 
@@ -179,7 +225,7 @@ func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	n := int(field.Number())
 	keyMethod := wireScalarWriter(field.MapKey().Kind())
 	if keyMethod == "" {
-		return []string{"throw UnsupportedError('dart-http wire: map key " + string(field.FullName()) + "');"}
+		return wireGuard(n, fname, "throw UnsupportedError('dart-http wire: map key " + string(field.FullName()) + "');")
 	}
 
 	var setValue string
@@ -196,7 +242,7 @@ func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	default:
 		vm := wireScalarWriter(field.MapValue().Kind())
 		if vm == "" {
-			return []string{"throw UnsupportedError('dart-http wire: map value " + string(field.FullName()) + "');"}
+			return wireGuard(n, fname, "throw UnsupportedError('dart-http wire: map value " + string(field.FullName()) + "');")
 		}
 		setValue = "ew." + vm + "(2, v);"
 	}
@@ -204,7 +250,7 @@ func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	return []string{
 		"final f" + fmt.Sprint(n) + " = " + fname + ";",
 		"if (f" + fmt.Sprint(n) + " != null) {",
-		"  f" + fmt.Sprint(n) + "!.forEach((k, v) {",
+		"  f" + fmt.Sprint(n) + ".forEach((k, v) {",
 		"    final ew = ProtoWireWriter();",
 		"    ew." + keyMethod + "(1, k);",
 		"    " + setValue,
@@ -266,7 +312,7 @@ func wireMapReadBody(pkg protoreflect.FullName, field protoreflect.FieldDescript
 		"  }",
 		"}",
 		"if (k != null && v != null) {",
-		"  (m." + fname + " ??= {})[k!] = v!;",
+		"  (m." + fname + " ??= {})[k] = v;",
 		"}",
 	}
 }
@@ -435,7 +481,7 @@ func (wkt WellKnown) wireWriteCall(pkg protoreflect.FullName, fieldNumber int, d
 	case WellKnownDoubleValue:
 		return "w.writeDoubleValue(" + n + ", " + dartExpr + ");"
 	default:
-		return "throw UnsupportedError('dart-http wire: " + string(wkt) + " not supported');"
+		return wkt.wireUnsupportedStmt()
 	}
 }
 

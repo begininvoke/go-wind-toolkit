@@ -4,7 +4,9 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import '../../../../transport.dart';
+import '../../../../proto_wire.dart';
 
 const defaultHost = 'api.example.com';
 
@@ -83,6 +85,73 @@ class LogEntry {
       severity: severity ?? this.severity,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: message
+    final f2 = message;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+    // field 3: severity
+    final f3 = severity;
+    if (f3 != null) {
+      w.writeString(3, f3);
+    }
+    // field 4: createTime
+    final f4 = createTime;
+    if (f4 != null) {
+      w.writeTimestamp(4, f4);
+    }
+  }
+
+  factory LogEntry.fromBuffer(List<int> bytes) {
+    return LogEntry._readFrom(ProtoWireReader(bytes));
+  }
+
+  static LogEntry _readFrom(ProtoWireReader r) {
+    final m = LogEntry();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        // field 2: message
+        case 2: {
+          m.message = r.readString();
+          break;
+        }
+        // field 3: severity
+        case 3: {
+          m.severity = r.readString();
+          break;
+        }
+        // field 4: createTime
+        case 4: {
+          m.createTime = r.readTimestampIso();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Well-known type: Timestamp
@@ -137,6 +206,43 @@ class GetLogRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory GetLogRequest.fromBuffer(List<int> bytes) {
+    return GetLogRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static GetLogRequest _readFrom(ProtoWireReader r) {
+    final m = GetLogRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for ListLogs.
@@ -194,6 +300,53 @@ class ListLogsRequest {
       pageToken: pageToken ?? this.pageToken,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: pageSize
+    final f1 = pageSize;
+    if (f1 != null) {
+      w.writeInt32(1, f1);
+    }
+    // field 2: pageToken
+    final f2 = pageToken;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+  }
+
+  factory ListLogsRequest.fromBuffer(List<int> bytes) {
+    return ListLogsRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListLogsRequest _readFrom(ProtoWireReader r) {
+    final m = ListLogsRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: pageSize
+        case 1: {
+          m.pageSize = r.readInt32();
+          break;
+        }
+        // field 2: pageToken
+        case 2: {
+          m.pageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Response message for ListLogs.
@@ -251,6 +404,53 @@ class ListLogsResponse {
       nextPageToken: nextPageToken ?? this.nextPageToken,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: logs
+    final f1 = logs;
+    if (f1 != null) {
+      for (final e in f1) { final cw = ProtoWireWriter(); e._writeTo(cw); w.writeRaw(1, cw.toBuffer()); }
+    }
+    // field 2: nextPageToken
+    final f2 = nextPageToken;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+  }
+
+  factory ListLogsResponse.fromBuffer(List<int> bytes) {
+    return ListLogsResponse._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ListLogsResponse _readFrom(ProtoWireReader r) {
+    final m = ListLogsResponse();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: logs
+        case 1: {
+          m.logs = r.readNestedList().map(LogEntry._readFrom).toList();
+          break;
+        }
+        // field 2: nextPageToken
+        case 2: {
+          m.nextPageToken = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Request message for TailLogs.
@@ -310,6 +510,53 @@ class TailLogsRequest {
       name: name ?? this.name,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: name
+    final f1 = name;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: filter
+    final f2 = filter;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+  }
+
+  factory TailLogsRequest.fromBuffer(List<int> bytes) {
+    return TailLogsRequest._readFrom(ProtoWireReader(bytes));
+  }
+
+  static TailLogsRequest _readFrom(ProtoWireReader r) {
+    final m = TailLogsRequest();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: name
+        case 1: {
+          m.name = r.readString();
+          break;
+        }
+        // field 2: filter
+        case 2: {
+          m.filter = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// A chat message.
@@ -378,6 +625,63 @@ class ChatMessage {
       text: text ?? this.text,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: from
+    final f1 = from;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+    // field 2: text
+    final f2 = text;
+    if (f2 != null) {
+      w.writeString(2, f2);
+    }
+    // field 3: sendTime
+    final f3 = sendTime;
+    if (f3 != null) {
+      w.writeTimestamp(3, f3);
+    }
+  }
+
+  factory ChatMessage.fromBuffer(List<int> bytes) {
+    return ChatMessage._readFrom(ProtoWireReader(bytes));
+  }
+
+  static ChatMessage _readFrom(ProtoWireReader r) {
+    final m = ChatMessage();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: from
+        case 1: {
+          m.from = r.readString();
+          break;
+        }
+        // field 2: text
+        case 2: {
+          m.text = r.readString();
+          break;
+        }
+        // field 3: sendTime
+        case 3: {
+          m.sendTime = r.readTimestampIso();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// This API demonstrates streaming RPC patterns with HTTP annotations.

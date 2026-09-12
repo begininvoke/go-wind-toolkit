@@ -2,7 +2,9 @@
 
 // ignore_for_file: unused_import, unnecessary_cast, avoid_print, non_constant_identifier_names, avoid_equals_and_hash_code_on_mutable_classes
 
+import 'dart:typed_data';
 import '../../../../transport.dart';
+import '../../../../proto_wire.dart';
 
 /// Message
 class Message {
@@ -57,6 +59,53 @@ class Message {
       forwardedMessage: forwardedMessage ?? this.forwardedMessage,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: forwardedMessage
+    final f1 = forwardedMessage;
+    if (f1 != null) {
+      final cw = ProtoWireWriter(); f1._writeTo(cw); w.writeRaw(1, cw.toBuffer()); // EinrideExampleSyntaxV1Message
+    }
+    // field 2: forwardedEnum
+    final f2 = forwardedEnum;
+    if (f2 != null) {
+      w.writeEnum(2, f2.wire); // EinrideExampleSyntaxV1Enum
+    }
+  }
+
+  factory Message.fromBuffer(List<int> bytes) {
+    return Message._readFrom(ProtoWireReader(bytes));
+  }
+
+  static Message _readFrom(ProtoWireReader r) {
+    final m = Message();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: forwardedMessage
+        case 1: {
+          m.forwardedMessage = EinrideExampleSyntaxV1Message._readFrom(r.readNested());
+          break;
+        }
+        // field 2: forwardedEnum
+        case 2: {
+          m.forwardedEnum = EinrideExampleSyntaxV1Enum.fromWire(r.readEnum());
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Message
@@ -64,7 +113,7 @@ class EinrideExampleSyntaxV1Message {
   /// any
   Map<String, dynamic>? any;
   /// bool
-  bool? bool;
+  bool? bool_;
   /// bool_value
   bool? boolValue;
   /// bytes
@@ -72,7 +121,7 @@ class EinrideExampleSyntaxV1Message {
   /// bytes_value
   String? bytesValue;
   /// double
-  double? double;
+  double? double_;
   /// double_value
   double? doubleValue;
   /// duration
@@ -246,11 +295,11 @@ class EinrideExampleSyntaxV1Message {
 
   EinrideExampleSyntaxV1Message({
     this.any,
-    this.bool,
+    this.bool_,
     this.boolValue,
     this.bytes,
     this.bytesValue,
-    this.double,
+    this.double_,
     this.doubleValue,
     this.duration,
     this.empty,
@@ -341,11 +390,11 @@ class EinrideExampleSyntaxV1Message {
   factory EinrideExampleSyntaxV1Message.fromJson(Map<String, dynamic> json) {
     return EinrideExampleSyntaxV1Message(
       any: json['any'] as Map<String, dynamic>?,
-      bool: json['bool'] as bool?,
+      bool_: json['bool'] as bool?,
       boolValue: json['boolValue'] as bool?,
       bytes: json['bytes'] as String?,
       bytesValue: json['bytesValue'] as String?,
-      double: (json['double'] as num?)?.toDouble(),
+      double_: (json['double'] as num?)?.toDouble(),
       doubleValue: (json['doubleValue'] as num?)?.toDouble(),
       duration: json['duration'] as String?,
       empty: json['empty'] as Map<String, dynamic>?,
@@ -437,11 +486,11 @@ class EinrideExampleSyntaxV1Message {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{};
     if (any != null) json['any'] = any;
-    if (bool != null) json['bool'] = bool;
+    if (bool_ != null) json['bool'] = bool_;
     if (boolValue != null) json['boolValue'] = boolValue;
     if (bytes != null) json['bytes'] = bytes;
     if (bytesValue != null) json['bytesValue'] = bytesValue;
-    if (double != null) json['double'] = double;
+    if (double_ != null) json['double'] = double_;
     if (doubleValue != null) json['doubleValue'] = doubleValue;
     if (duration != null) json['duration'] = duration;
     if (empty != null) json['empty'] = empty;
@@ -532,7 +581,7 @@ class EinrideExampleSyntaxV1Message {
 
   @override
   String toString() {
-    return 'EinrideExampleSyntaxV1Message(any: $any, bool: $bool, boolValue: $boolValue, bytes: $bytes, bytesValue: $bytesValue, double: $double, doubleValue: $doubleValue, duration: $duration, empty: $empty, enum_: $enum_, fieldMask: $fieldMask, fixed32: $fixed32, fixed64: $fixed64, float: $float, floatValue: $floatValue, int32: $int32, int32Value: $int32Value, int64: $int64, int64Value: $int64Value, listValue: $listValue, mapStringMessage: $mapStringMessage, mapStringString: $mapStringString, message: $message, nullValue: $nullValue, oneofEnum: $oneofEnum, oneofMessage1: $oneofMessage1, oneofMessage2: $oneofMessage2, oneofString: $oneofString, optionalBool: $optionalBool, optionalBytes: $optionalBytes, optionalDouble: $optionalDouble, optionalEnum: $optionalEnum, optionalFixed32: $optionalFixed32, optionalFixed64: $optionalFixed64, optionalFloat: $optionalFloat, optionalInt32: $optionalInt32, optionalInt64: $optionalInt64, optionalMessage: $optionalMessage, optionalSfixed32: $optionalSfixed32, optionalSfixed64: $optionalSfixed64, optionalSint32: $optionalSint32, optionalSint64: $optionalSint64, optionalString: $optionalString, optionalUint32: $optionalUint32, optionalUint64: $optionalUint64, repeatedAny: $repeatedAny, repeatedBool: $repeatedBool, repeatedBoolValue: $repeatedBoolValue, repeatedBytes: $repeatedBytes, repeatedBytesValue: $repeatedBytesValue, repeatedDouble: $repeatedDouble, repeatedDoubleValue: $repeatedDoubleValue, repeatedDuration: $repeatedDuration, repeatedEmpty: $repeatedEmpty, repeatedEnum: $repeatedEnum, repeatedFieldMask: $repeatedFieldMask, repeatedFixed32: $repeatedFixed32, repeatedFixed64: $repeatedFixed64, repeatedFloat: $repeatedFloat, repeatedFloatValue: $repeatedFloatValue, repeatedInt32: $repeatedInt32, repeatedInt32Value: $repeatedInt32Value, repeatedInt64: $repeatedInt64, repeatedInt64Value: $repeatedInt64Value, repeatedListValue: $repeatedListValue, repeatedMessage: $repeatedMessage, repeatedNullValue: $repeatedNullValue, repeatedSfixed32: $repeatedSfixed32, repeatedSfixed64: $repeatedSfixed64, repeatedSint32: $repeatedSint32, repeatedSint64: $repeatedSint64, repeatedString: $repeatedString, repeatedStringValue: $repeatedStringValue, repeatedStruct: $repeatedStruct, repeatedUint32: $repeatedUint32, repeatedUint32Value: $repeatedUint32Value, repeatedUint64: $repeatedUint64, repeatedUint64Value: $repeatedUint64Value, repeatedValue: $repeatedValue, sfixed32: $sfixed32, sfixed64: $sfixed64, sint32: $sint32, sint64: $sint64, string: $string, stringValue: $stringValue, struct: $struct, uint32: $uint32, uint32Value: $uint32Value, uint64: $uint64, uint64Value: $uint64Value, value: $value)';
+    return 'EinrideExampleSyntaxV1Message(any: $any, bool_: $bool_, boolValue: $boolValue, bytes: $bytes, bytesValue: $bytesValue, double_: $double_, doubleValue: $doubleValue, duration: $duration, empty: $empty, enum_: $enum_, fieldMask: $fieldMask, fixed32: $fixed32, fixed64: $fixed64, float: $float, floatValue: $floatValue, int32: $int32, int32Value: $int32Value, int64: $int64, int64Value: $int64Value, listValue: $listValue, mapStringMessage: $mapStringMessage, mapStringString: $mapStringString, message: $message, nullValue: $nullValue, oneofEnum: $oneofEnum, oneofMessage1: $oneofMessage1, oneofMessage2: $oneofMessage2, oneofString: $oneofString, optionalBool: $optionalBool, optionalBytes: $optionalBytes, optionalDouble: $optionalDouble, optionalEnum: $optionalEnum, optionalFixed32: $optionalFixed32, optionalFixed64: $optionalFixed64, optionalFloat: $optionalFloat, optionalInt32: $optionalInt32, optionalInt64: $optionalInt64, optionalMessage: $optionalMessage, optionalSfixed32: $optionalSfixed32, optionalSfixed64: $optionalSfixed64, optionalSint32: $optionalSint32, optionalSint64: $optionalSint64, optionalString: $optionalString, optionalUint32: $optionalUint32, optionalUint64: $optionalUint64, repeatedAny: $repeatedAny, repeatedBool: $repeatedBool, repeatedBoolValue: $repeatedBoolValue, repeatedBytes: $repeatedBytes, repeatedBytesValue: $repeatedBytesValue, repeatedDouble: $repeatedDouble, repeatedDoubleValue: $repeatedDoubleValue, repeatedDuration: $repeatedDuration, repeatedEmpty: $repeatedEmpty, repeatedEnum: $repeatedEnum, repeatedFieldMask: $repeatedFieldMask, repeatedFixed32: $repeatedFixed32, repeatedFixed64: $repeatedFixed64, repeatedFloat: $repeatedFloat, repeatedFloatValue: $repeatedFloatValue, repeatedInt32: $repeatedInt32, repeatedInt32Value: $repeatedInt32Value, repeatedInt64: $repeatedInt64, repeatedInt64Value: $repeatedInt64Value, repeatedListValue: $repeatedListValue, repeatedMessage: $repeatedMessage, repeatedNullValue: $repeatedNullValue, repeatedSfixed32: $repeatedSfixed32, repeatedSfixed64: $repeatedSfixed64, repeatedSint32: $repeatedSint32, repeatedSint64: $repeatedSint64, repeatedString: $repeatedString, repeatedStringValue: $repeatedStringValue, repeatedStruct: $repeatedStruct, repeatedUint32: $repeatedUint32, repeatedUint32Value: $repeatedUint32Value, repeatedUint64: $repeatedUint64, repeatedUint64Value: $repeatedUint64Value, repeatedValue: $repeatedValue, sfixed32: $sfixed32, sfixed64: $sfixed64, sint32: $sint32, sint64: $sint64, string: $string, stringValue: $stringValue, struct: $struct, uint32: $uint32, uint32Value: $uint32Value, uint64: $uint64, uint64Value: $uint64Value, value: $value)';
   }
 
   @override
@@ -541,11 +590,11 @@ class EinrideExampleSyntaxV1Message {
     other is EinrideExampleSyntaxV1Message &&
       runtimeType == other.runtimeType
       && any == other.any
-      && bool == other.bool
+      && bool_ == other.bool_
       && boolValue == other.boolValue
       && bytes == other.bytes
       && bytesValue == other.bytesValue
-      && double == other.double
+      && double_ == other.double_
       && doubleValue == other.doubleValue
       && duration == other.duration
       && empty == other.empty
@@ -636,11 +685,11 @@ class EinrideExampleSyntaxV1Message {
   @override
   int get hashCode => Object.hashAll([
     any,
-    bool,
+    bool_,
     boolValue,
     bytes,
     bytesValue,
-    double,
+    double_,
     doubleValue,
     duration,
     empty,
@@ -730,11 +779,11 @@ class EinrideExampleSyntaxV1Message {
 
   EinrideExampleSyntaxV1Message copyWith({
     Map<String, dynamic>? any,
-    bool? bool,
+    bool? bool_,
     bool? boolValue,
     String? bytes,
     String? bytesValue,
-    double? double,
+    double? double_,
     double? doubleValue,
     String? duration,
     Map<String, dynamic>? empty,
@@ -823,11 +872,11 @@ class EinrideExampleSyntaxV1Message {
   }) {
     return EinrideExampleSyntaxV1Message(
       any: any ?? this.any,
-      bool: bool ?? this.bool,
+      bool_: bool_ ?? this.bool_,
       boolValue: boolValue ?? this.boolValue,
       bytes: bytes ?? this.bytes,
       bytesValue: bytesValue ?? this.bytesValue,
-      double: double ?? this.double,
+      double_: double_ ?? this.double_,
       doubleValue: doubleValue ?? this.doubleValue,
       duration: duration ?? this.duration,
       empty: empty ?? this.empty,
@@ -915,19 +964,996 @@ class EinrideExampleSyntaxV1Message {
       value: value ?? this.value,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: double
+    final f1 = double_;
+    if (f1 != null) {
+      w.writeDouble(1, f1);
+    }
+    // field 2: float
+    final f2 = float;
+    if (f2 != null) {
+      w.writeFloat(2, f2);
+    }
+    // field 3: int32
+    final f3 = int32;
+    if (f3 != null) {
+      w.writeInt32(3, f3);
+    }
+    // field 4: int64
+    final f4 = int64;
+    if (f4 != null) {
+      w.writeInt64(4, f4);
+    }
+    // field 5: uint32
+    final f5 = uint32;
+    if (f5 != null) {
+      w.writeUint32(5, f5);
+    }
+    // field 6: uint64
+    final f6 = uint64;
+    if (f6 != null) {
+      w.writeUint64(6, f6);
+    }
+    // field 7: sint32
+    final f7 = sint32;
+    if (f7 != null) {
+      w.writeSint32(7, f7);
+    }
+    // field 8: sint64
+    final f8 = sint64;
+    if (f8 != null) {
+      w.writeSint64(8, f8);
+    }
+    // field 9: fixed32
+    final f9 = fixed32;
+    if (f9 != null) {
+      w.writeFixed32(9, f9);
+    }
+    // field 10: fixed64
+    final f10 = fixed64;
+    if (f10 != null) {
+      w.writeFixed64(10, f10);
+    }
+    // field 11: sfixed32
+    final f11 = sfixed32;
+    if (f11 != null) {
+      w.writeSfixed32(11, f11);
+    }
+    // field 12: sfixed64
+    final f12 = sfixed64;
+    if (f12 != null) {
+      w.writeSfixed64(12, f12);
+    }
+    // field 13: bool
+    final f13 = bool_;
+    if (f13 != null) {
+      w.writeBool(13, f13);
+    }
+    // field 14: string
+    final f14 = string;
+    if (f14 != null) {
+      w.writeString(14, f14);
+    }
+    // field 15: bytes
+    final f15 = bytes;
+    if (f15 != null) {
+      throw UnsupportedError('dart-http wire: field einride.example.syntax.v1.Message.bytes');
+    }
+    // field 16: enum
+    final f16 = enum_;
+    if (f16 != null) {
+      w.writeEnum(16, f16.wire); // EinrideExampleSyntaxV1Enum
+    }
+    // field 17: message
+    final f17 = message;
+    if (f17 != null) {
+      final cw = ProtoWireWriter(); f17._writeTo(cw); w.writeRaw(17, cw.toBuffer()); // EinrideExampleSyntaxV1Message
+    }
+    // field 18: repeatedDouble
+    final f18 = repeatedDouble;
+    if (f18 != null) {
+      w.writePackedDoubleList(18, f18);
+    }
+    // field 19: repeatedFloat
+    final f19 = repeatedFloat;
+    if (f19 != null) {
+      w.writePackedFloatList(19, f19);
+    }
+    // field 20: repeatedInt32
+    final f20 = repeatedInt32;
+    if (f20 != null) {
+      w.writePackedVarintList(20, f20);
+    }
+    // field 21: repeatedInt64
+    final f21 = repeatedInt64;
+    if (f21 != null) {
+      w.writePackedVarintList(21, f21);
+    }
+    // field 22: repeatedUint32
+    final f22 = repeatedUint32;
+    if (f22 != null) {
+      w.writePackedVarintList(22, f22);
+    }
+    // field 23: repeatedUint64
+    final f23 = repeatedUint64;
+    if (f23 != null) {
+      w.writePackedVarintList(23, f23);
+    }
+    // field 24: repeatedSint32
+    final f24 = repeatedSint32;
+    if (f24 != null) {
+      w.writePackedSint32List(24, f24);
+    }
+    // field 25: repeatedSint64
+    final f25 = repeatedSint64;
+    if (f25 != null) {
+      w.writePackedSint64List(25, f25);
+    }
+    // field 26: repeatedFixed32
+    final f26 = repeatedFixed32;
+    if (f26 != null) {
+      w.writePackedFixed32List(26, f26);
+    }
+    // field 27: repeatedFixed64
+    final f27 = repeatedFixed64;
+    if (f27 != null) {
+      w.writePackedFixed64List(27, f27);
+    }
+    // field 28: repeatedSfixed32
+    final f28 = repeatedSfixed32;
+    if (f28 != null) {
+      w.writePackedFixed32List(28, f28);
+    }
+    // field 29: repeatedSfixed64
+    final f29 = repeatedSfixed64;
+    if (f29 != null) {
+      w.writePackedFixed64List(29, f29);
+    }
+    // field 30: repeatedBool
+    final f30 = repeatedBool;
+    if (f30 != null) {
+      w.writePackedBoolList(30, f30);
+    }
+    // field 31: repeatedString
+    final f31 = repeatedString;
+    if (f31 != null) {
+      w.writeStringList(31, f31);
+    }
+    // field 32: repeatedBytes
+    final f32 = repeatedBytes;
+    if (f32 != null) {
+      w.writeBytesList(32, f32);
+    }
+    // field 33: repeatedEnum
+    final f33 = repeatedEnum;
+    if (f33 != null) {
+      w.writePackedVarintList(33, f33.map((e) => e.wire).toList()); // EinrideExampleSyntaxV1Enum
+    }
+    // field 34: repeatedMessage
+    final f34 = repeatedMessage;
+    if (f34 != null) {
+      for (final e in f34) { final cw = ProtoWireWriter(); e._writeTo(cw); w.writeRaw(34, cw.toBuffer()); }
+    }
+    // field 35: mapStringString
+    final f35 = mapStringString;
+    if (f35 != null) {
+      f35.forEach((k, v) {
+        final ew = ProtoWireWriter();
+        ew.writeString(1, k);
+        ew.writeString(2, v);
+        w.writeRaw(35, ew.toBuffer());
+      });
+    }
+    // field 36: mapStringMessage
+    final f36 = mapStringMessage;
+    if (f36 != null) {
+      f36.forEach((k, v) {
+        final ew = ProtoWireWriter();
+        ew.writeString(1, k);
+        final vw = ProtoWireWriter(); v._writeTo(vw); ew.writeRaw(2, vw.toBuffer());
+        w.writeRaw(36, ew.toBuffer());
+      });
+    }
+    // field 37: oneofString
+    final f37 = oneofString;
+    if (f37 != null) {
+      w.writeString(37, f37);
+    }
+    // field 38: oneofEnum
+    final f38 = oneofEnum;
+    if (f38 != null) {
+      w.writeEnum(38, f38.wire); // EinrideExampleSyntaxV1Enum
+    }
+    // field 39: oneofMessage1
+    final f39 = oneofMessage1;
+    if (f39 != null) {
+      final cw = ProtoWireWriter(); f39._writeTo(cw); w.writeRaw(39, cw.toBuffer()); // EinrideExampleSyntaxV1Message
+    }
+    // field 40: oneofMessage2
+    final f40 = oneofMessage2;
+    if (f40 != null) {
+      final cw = ProtoWireWriter(); f40._writeTo(cw); w.writeRaw(40, cw.toBuffer()); // EinrideExampleSyntaxV1Message
+    }
+    // field 41: any
+    final f41 = any;
+    if (f41 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.Any not supported');
+    }
+    // field 42: repeatedAny
+    final f42 = repeatedAny;
+    if (f42 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.Any not supported');
+    }
+    // field 43: duration
+    final f43 = duration;
+    if (f43 != null) {
+      w.writeDuration(43, f43);
+    }
+    // field 44: repeatedDuration
+    final f44 = repeatedDuration;
+    if (f44 != null) {
+      for (final e in f44) { w.writeDuration(44, e); }
+    }
+    // field 45: empty
+    final f45 = empty;
+    if (f45 != null) {
+      w.writeEmpty(45);
+    }
+    // field 46: repeatedEmpty
+    final f46 = repeatedEmpty;
+    if (f46 != null) {
+      for (final _ in f46) { w.writeEmpty(46); }
+    }
+    // field 47: fieldMask
+    final f47 = fieldMask;
+    if (f47 != null) {
+      w.writeFieldMask(47, f47);
+    }
+    // field 48: repeatedFieldMask
+    final f48 = repeatedFieldMask;
+    if (f48 != null) {
+      for (final e in f48) { w.writeFieldMask(48, e); }
+    }
+    // field 49: struct
+    final f49 = struct;
+    if (f49 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.Struct not supported');
+    }
+    // field 50: repeatedStruct
+    final f50 = repeatedStruct;
+    if (f50 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.Struct not supported');
+    }
+    // field 51: value
+    final f51 = value;
+    if (f51 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.Value not supported');
+    }
+    // field 52: repeatedValue
+    final f52 = repeatedValue;
+    if (f52 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.Value not supported');
+    }
+    // field 53: nullValue
+    final f53 = nullValue;
+    if (f53 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.NullValue not supported');
+    }
+    // field 54: repeatedNullValue
+    final f54 = repeatedNullValue;
+    if (f54 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.NullValue not supported');
+    }
+    // field 55: listValue
+    final f55 = listValue;
+    if (f55 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.ListValue not supported');
+    }
+    // field 56: repeatedListValue
+    final f56 = repeatedListValue;
+    if (f56 != null) {
+      throw UnsupportedError('dart-http wire: google.protobuf.ListValue not supported');
+    }
+    // field 57: boolValue
+    final f57 = boolValue;
+    if (f57 != null) {
+      w.writeBoolValue(57, f57);
+    }
+    // field 58: repeatedBoolValue
+    final f58 = repeatedBoolValue;
+    if (f58 != null) {
+      for (final e in f58) { w.writeBoolValue(58, e); }
+    }
+    // field 59: bytesValue
+    final f59 = bytesValue;
+    if (f59 != null) {
+      w.writeBytesValue(59, f59);
+    }
+    // field 60: repeatedBytesValue
+    final f60 = repeatedBytesValue;
+    if (f60 != null) {
+      for (final e in f60) { w.writeBytesValue(60, e); }
+    }
+    // field 61: doubleValue
+    final f61 = doubleValue;
+    if (f61 != null) {
+      w.writeDoubleValue(61, f61);
+    }
+    // field 62: repeatedDoubleValue
+    final f62 = repeatedDoubleValue;
+    if (f62 != null) {
+      for (final e in f62) { w.writeDoubleValue(62, e); }
+    }
+    // field 63: floatValue
+    final f63 = floatValue;
+    if (f63 != null) {
+      w.writeFloatValue(63, f63);
+    }
+    // field 64: repeatedFloatValue
+    final f64 = repeatedFloatValue;
+    if (f64 != null) {
+      for (final e in f64) { w.writeFloatValue(64, e); }
+    }
+    // field 65: int32Value
+    final f65 = int32Value;
+    if (f65 != null) {
+      w.writeInt32Value(65, f65);
+    }
+    // field 66: repeatedInt32Value
+    final f66 = repeatedInt32Value;
+    if (f66 != null) {
+      for (final e in f66) { w.writeInt32Value(66, e); }
+    }
+    // field 67: int64Value
+    final f67 = int64Value;
+    if (f67 != null) {
+      w.writeInt64Value(67, f67);
+    }
+    // field 68: repeatedInt64Value
+    final f68 = repeatedInt64Value;
+    if (f68 != null) {
+      for (final e in f68) { w.writeInt64Value(68, e); }
+    }
+    // field 69: uint32Value
+    final f69 = uint32Value;
+    if (f69 != null) {
+      w.writeUint32Value(69, f69);
+    }
+    // field 70: repeatedUint32Value
+    final f70 = repeatedUint32Value;
+    if (f70 != null) {
+      for (final e in f70) { w.writeUint32Value(70, e); }
+    }
+    // field 71: uint64Value
+    final f71 = uint64Value;
+    if (f71 != null) {
+      w.writeUint64Value(71, f71);
+    }
+    // field 72: repeatedUint64Value
+    final f72 = repeatedUint64Value;
+    if (f72 != null) {
+      for (final e in f72) { w.writeUint64Value(72, e); }
+    }
+    // field 73: stringValue
+    final f73 = stringValue;
+    if (f73 != null) {
+      w.writeUint64Value(73, f73);
+    }
+    // field 74: repeatedStringValue
+    final f74 = repeatedStringValue;
+    if (f74 != null) {
+      for (final e in f74) { w.writeStringValue(74, e); }
+    }
+    // field 81: optionalDouble
+    final f81 = optionalDouble;
+    if (f81 != null) {
+      w.writeDouble(81, f81);
+    }
+    // field 82: optionalFloat
+    final f82 = optionalFloat;
+    if (f82 != null) {
+      w.writeFloat(82, f82);
+    }
+    // field 83: optionalInt32
+    final f83 = optionalInt32;
+    if (f83 != null) {
+      w.writeInt32(83, f83);
+    }
+    // field 84: optionalInt64
+    final f84 = optionalInt64;
+    if (f84 != null) {
+      w.writeInt64(84, f84);
+    }
+    // field 85: optionalUint32
+    final f85 = optionalUint32;
+    if (f85 != null) {
+      w.writeUint32(85, f85);
+    }
+    // field 86: optionalUint64
+    final f86 = optionalUint64;
+    if (f86 != null) {
+      w.writeUint64(86, f86);
+    }
+    // field 87: optionalSint32
+    final f87 = optionalSint32;
+    if (f87 != null) {
+      w.writeSint32(87, f87);
+    }
+    // field 88: optionalSint64
+    final f88 = optionalSint64;
+    if (f88 != null) {
+      w.writeSint64(88, f88);
+    }
+    // field 89: optionalFixed32
+    final f89 = optionalFixed32;
+    if (f89 != null) {
+      w.writeFixed32(89, f89);
+    }
+    // field 90: optionalFixed64
+    final f90 = optionalFixed64;
+    if (f90 != null) {
+      w.writeFixed64(90, f90);
+    }
+    // field 91: optionalSfixed32
+    final f91 = optionalSfixed32;
+    if (f91 != null) {
+      w.writeSfixed32(91, f91);
+    }
+    // field 92: optionalSfixed64
+    final f92 = optionalSfixed64;
+    if (f92 != null) {
+      w.writeSfixed64(92, f92);
+    }
+    // field 93: optionalBool
+    final f93 = optionalBool;
+    if (f93 != null) {
+      w.writeBool(93, f93);
+    }
+    // field 94: optionalString
+    final f94 = optionalString;
+    if (f94 != null) {
+      w.writeString(94, f94);
+    }
+    // field 95: optionalBytes
+    final f95 = optionalBytes;
+    if (f95 != null) {
+      throw UnsupportedError('dart-http wire: field einride.example.syntax.v1.Message.optional_bytes');
+    }
+    // field 96: optionalEnum
+    final f96 = optionalEnum;
+    if (f96 != null) {
+      w.writeEnum(96, f96.wire); // EinrideExampleSyntaxV1Enum
+    }
+    // field 97: optionalMessage
+    final f97 = optionalMessage;
+    if (f97 != null) {
+      final cw = ProtoWireWriter(); f97._writeTo(cw); w.writeRaw(97, cw.toBuffer()); // EinrideExampleSyntaxV1Message
+    }
+  }
+
+  factory EinrideExampleSyntaxV1Message.fromBuffer(List<int> bytes) {
+    return EinrideExampleSyntaxV1Message._readFrom(ProtoWireReader(bytes));
+  }
+
+  static EinrideExampleSyntaxV1Message _readFrom(ProtoWireReader r) {
+    final m = EinrideExampleSyntaxV1Message();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: double
+        case 1: {
+          m.double_ = r.readDouble();
+          break;
+        }
+        // field 2: float
+        case 2: {
+          m.float = r.readFloat();
+          break;
+        }
+        // field 3: int32
+        case 3: {
+          m.int32 = r.readInt32();
+          break;
+        }
+        // field 4: int64
+        case 4: {
+          m.int64 = r.readInt64();
+          break;
+        }
+        // field 5: uint32
+        case 5: {
+          m.uint32 = r.readUint32();
+          break;
+        }
+        // field 6: uint64
+        case 6: {
+          m.uint64 = r.readUint64();
+          break;
+        }
+        // field 7: sint32
+        case 7: {
+          m.sint32 = r.readSint32();
+          break;
+        }
+        // field 8: sint64
+        case 8: {
+          m.sint64 = r.readSint64();
+          break;
+        }
+        // field 9: fixed32
+        case 9: {
+          m.fixed32 = r.readFixed32();
+          break;
+        }
+        // field 10: fixed64
+        case 10: {
+          m.fixed64 = r.readFixed64();
+          break;
+        }
+        // field 11: sfixed32
+        case 11: {
+          m.sfixed32 = r.readSfixed32();
+          break;
+        }
+        // field 12: sfixed64
+        case 12: {
+          m.sfixed64 = r.readSfixed64();
+          break;
+        }
+        // field 13: bool
+        case 13: {
+          m.bool_ = r.readBool();
+          break;
+        }
+        // field 14: string
+        case 14: {
+          m.string = r.readString();
+          break;
+        }
+        // field 15: bytes
+        case 15: {
+          r.skip();
+          break;
+        }
+        // field 16: enum
+        case 16: {
+          m.enum_ = EinrideExampleSyntaxV1Enum.fromWire(r.readEnum());
+          break;
+        }
+        // field 17: message
+        case 17: {
+          m.message = EinrideExampleSyntaxV1Message._readFrom(r.readNested());
+          break;
+        }
+        // field 18: repeatedDouble
+        case 18: {
+          m.repeatedDouble = r.readDoubleList();
+          break;
+        }
+        // field 19: repeatedFloat
+        case 19: {
+          m.repeatedFloat = r.readFloatList();
+          break;
+        }
+        // field 20: repeatedInt32
+        case 20: {
+          m.repeatedInt32 = r.readVarintList();
+          break;
+        }
+        // field 21: repeatedInt64
+        case 21: {
+          m.repeatedInt64 = r.readVarintList();
+          break;
+        }
+        // field 22: repeatedUint32
+        case 22: {
+          m.repeatedUint32 = r.readVarintList();
+          break;
+        }
+        // field 23: repeatedUint64
+        case 23: {
+          m.repeatedUint64 = r.readVarintList();
+          break;
+        }
+        // field 24: repeatedSint32
+        case 24: {
+          m.repeatedSint32 = r.readZigzag32List();
+          break;
+        }
+        // field 25: repeatedSint64
+        case 25: {
+          m.repeatedSint64 = r.readZigzag64List();
+          break;
+        }
+        // field 26: repeatedFixed32
+        case 26: {
+          m.repeatedFixed32 = r.readFixed32List();
+          break;
+        }
+        // field 27: repeatedFixed64
+        case 27: {
+          m.repeatedFixed64 = r.readFixed64List();
+          break;
+        }
+        // field 28: repeatedSfixed32
+        case 28: {
+          m.repeatedSfixed32 = r.readFixed32List();
+          break;
+        }
+        // field 29: repeatedSfixed64
+        case 29: {
+          m.repeatedSfixed64 = r.readFixed64List();
+          break;
+        }
+        // field 30: repeatedBool
+        case 30: {
+          m.repeatedBool = r.readBoolList();
+          break;
+        }
+        // field 31: repeatedString
+        case 31: {
+          m.repeatedString = r.readStringList();
+          break;
+        }
+        // field 32: repeatedBytes
+        case 32: {
+          m.repeatedBytes = r.readBytesListText();
+          break;
+        }
+        // field 33: repeatedEnum
+        case 33: {
+          m.repeatedEnum = r.readVarintList().map(EinrideExampleSyntaxV1Enum.fromWire).toList();
+          break;
+        }
+        // field 34: repeatedMessage
+        case 34: {
+          m.repeatedMessage = r.readNestedList().map(EinrideExampleSyntaxV1Message._readFrom).toList();
+          break;
+        }
+        // field 35: mapStringString
+        case 35: {
+          final er = r.readNested();
+          String? k;
+          String? v;
+          while (er.next()) {
+            switch (er.fieldNumber) {
+              case 1: {
+                k = er.readString();
+                break;
+              }
+              case 2: {
+                v = er.readString();
+                break;
+              }
+              default: er.skip();
+            }
+          }
+          if (k != null && v != null) {
+            (m.mapStringString ??= {})[k] = v;
+          }
+          break;
+        }
+        // field 36: mapStringMessage
+        case 36: {
+          final er = r.readNested();
+          String? k;
+          EinrideExampleSyntaxV1Message? v;
+          while (er.next()) {
+            switch (er.fieldNumber) {
+              case 1: {
+                k = er.readString();
+                break;
+              }
+              case 2: {
+                v = EinrideExampleSyntaxV1Message._readFrom(er.readNested());
+                break;
+              }
+              default: er.skip();
+            }
+          }
+          if (k != null && v != null) {
+            (m.mapStringMessage ??= {})[k] = v;
+          }
+          break;
+        }
+        // field 37: oneofString
+        case 37: {
+          m.oneofString = r.readString();
+          break;
+        }
+        // field 38: oneofEnum
+        case 38: {
+          m.oneofEnum = EinrideExampleSyntaxV1Enum.fromWire(r.readEnum());
+          break;
+        }
+        // field 39: oneofMessage1
+        case 39: {
+          m.oneofMessage1 = EinrideExampleSyntaxV1Message._readFrom(r.readNested());
+          break;
+        }
+        // field 40: oneofMessage2
+        case 40: {
+          m.oneofMessage2 = EinrideExampleSyntaxV1Message._readFrom(r.readNested());
+          break;
+        }
+        // field 41: any
+        case 41: {
+          throw UnsupportedError('dart-http wire: google.protobuf.Any not supported');
+        }
+        // field 42: repeatedAny
+        case 42: {
+          throw UnsupportedError('dart-http wire: google.protobuf.Any not supported');
+        }
+        // field 43: duration
+        case 43: {
+          m.duration = r.readDurationText();
+          break;
+        }
+        // field 44: repeatedDuration
+        case 44: {
+          m.repeatedDuration = r.readNestedList().map((er) => er.readDurationText()).toList();
+          break;
+        }
+        // field 45: empty
+        case 45: {
+          m.empty = r.readEmpty();
+          break;
+        }
+        // field 46: repeatedEmpty
+        case 46: {
+          m.repeatedEmpty = r.readNestedList().map((er) => er.readEmpty()).toList();
+          break;
+        }
+        // field 47: fieldMask
+        case 47: {
+          m.fieldMask = r.readFieldMaskText();
+          break;
+        }
+        // field 48: repeatedFieldMask
+        case 48: {
+          m.repeatedFieldMask = r.readNestedList().map((er) => er.readFieldMaskText()).toList();
+          break;
+        }
+        // field 49: struct
+        case 49: {
+          throw UnsupportedError('dart-http wire: google.protobuf.Struct not supported');
+        }
+        // field 50: repeatedStruct
+        case 50: {
+          throw UnsupportedError('dart-http wire: google.protobuf.Struct not supported');
+        }
+        // field 51: value
+        case 51: {
+          throw UnsupportedError('dart-http wire: google.protobuf.Value not supported');
+        }
+        // field 52: repeatedValue
+        case 52: {
+          throw UnsupportedError('dart-http wire: google.protobuf.Value not supported');
+        }
+        // field 53: nullValue
+        case 53: {
+          throw UnsupportedError('dart-http wire: google.protobuf.NullValue not supported');
+        }
+        // field 54: repeatedNullValue
+        case 54: {
+          throw UnsupportedError('dart-http wire: google.protobuf.NullValue not supported');
+        }
+        // field 55: listValue
+        case 55: {
+          throw UnsupportedError('dart-http wire: google.protobuf.ListValue not supported');
+        }
+        // field 56: repeatedListValue
+        case 56: {
+          throw UnsupportedError('dart-http wire: google.protobuf.ListValue not supported');
+        }
+        // field 57: boolValue
+        case 57: {
+          m.boolValue = r.readBoolValue();
+          break;
+        }
+        // field 58: repeatedBoolValue
+        case 58: {
+          m.repeatedBoolValue = r.readNestedList().map((er) => er.readBoolValue()).toList();
+          break;
+        }
+        // field 59: bytesValue
+        case 59: {
+          m.bytesValue = r.readBytesValueText();
+          break;
+        }
+        // field 60: repeatedBytesValue
+        case 60: {
+          m.repeatedBytesValue = r.readNestedList().map((er) => er.readBytesValueText()).toList();
+          break;
+        }
+        // field 61: doubleValue
+        case 61: {
+          m.doubleValue = r.readDoubleValue();
+          break;
+        }
+        // field 62: repeatedDoubleValue
+        case 62: {
+          m.repeatedDoubleValue = r.readNestedList().map((er) => er.readDoubleValue()).toList();
+          break;
+        }
+        // field 63: floatValue
+        case 63: {
+          m.floatValue = r.readFloatValue();
+          break;
+        }
+        // field 64: repeatedFloatValue
+        case 64: {
+          m.repeatedFloatValue = r.readNestedList().map((er) => er.readFloatValue()).toList();
+          break;
+        }
+        // field 65: int32Value
+        case 65: {
+          m.int32Value = r.readInt32Value();
+          break;
+        }
+        // field 66: repeatedInt32Value
+        case 66: {
+          m.repeatedInt32Value = r.readNestedList().map((er) => er.readInt32Value()).toList();
+          break;
+        }
+        // field 67: int64Value
+        case 67: {
+          m.int64Value = r.readInt64Value();
+          break;
+        }
+        // field 68: repeatedInt64Value
+        case 68: {
+          m.repeatedInt64Value = r.readNestedList().map((er) => er.readInt64Value()).toList();
+          break;
+        }
+        // field 69: uint32Value
+        case 69: {
+          m.uint32Value = r.readUint32Value();
+          break;
+        }
+        // field 70: repeatedUint32Value
+        case 70: {
+          m.repeatedUint32Value = r.readNestedList().map((er) => er.readUint32Value()).toList();
+          break;
+        }
+        // field 71: uint64Value
+        case 71: {
+          m.uint64Value = r.readUint64Value();
+          break;
+        }
+        // field 72: repeatedUint64Value
+        case 72: {
+          m.repeatedUint64Value = r.readNestedList().map((er) => er.readUint64Value()).toList();
+          break;
+        }
+        // field 73: stringValue
+        case 73: {
+          m.stringValue = r.readUint64Value();
+          break;
+        }
+        // field 74: repeatedStringValue
+        case 74: {
+          m.repeatedStringValue = r.readNestedList().map((er) => er.readStringValue()).toList();
+          break;
+        }
+        // field 81: optionalDouble
+        case 81: {
+          m.optionalDouble = r.readDouble();
+          break;
+        }
+        // field 82: optionalFloat
+        case 82: {
+          m.optionalFloat = r.readFloat();
+          break;
+        }
+        // field 83: optionalInt32
+        case 83: {
+          m.optionalInt32 = r.readInt32();
+          break;
+        }
+        // field 84: optionalInt64
+        case 84: {
+          m.optionalInt64 = r.readInt64();
+          break;
+        }
+        // field 85: optionalUint32
+        case 85: {
+          m.optionalUint32 = r.readUint32();
+          break;
+        }
+        // field 86: optionalUint64
+        case 86: {
+          m.optionalUint64 = r.readUint64();
+          break;
+        }
+        // field 87: optionalSint32
+        case 87: {
+          m.optionalSint32 = r.readSint32();
+          break;
+        }
+        // field 88: optionalSint64
+        case 88: {
+          m.optionalSint64 = r.readSint64();
+          break;
+        }
+        // field 89: optionalFixed32
+        case 89: {
+          m.optionalFixed32 = r.readFixed32();
+          break;
+        }
+        // field 90: optionalFixed64
+        case 90: {
+          m.optionalFixed64 = r.readFixed64();
+          break;
+        }
+        // field 91: optionalSfixed32
+        case 91: {
+          m.optionalSfixed32 = r.readSfixed32();
+          break;
+        }
+        // field 92: optionalSfixed64
+        case 92: {
+          m.optionalSfixed64 = r.readSfixed64();
+          break;
+        }
+        // field 93: optionalBool
+        case 93: {
+          m.optionalBool = r.readBool();
+          break;
+        }
+        // field 94: optionalString
+        case 94: {
+          m.optionalString = r.readString();
+          break;
+        }
+        // field 95: optionalBytes
+        case 95: {
+          r.skip();
+          break;
+        }
+        // field 96: optionalEnum
+        case 96: {
+          m.optionalEnum = EinrideExampleSyntaxV1Enum.fromWire(r.readEnum());
+          break;
+        }
+        // field 97: optionalMessage
+        case 97: {
+          m.optionalMessage = EinrideExampleSyntaxV1Message._readFrom(r.readNested());
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// Enum
 enum EinrideExampleSyntaxV1Enum {
-  enumOne('ENUM_ONE'),
-  enumTwo('ENUM_TWO'),
-  enumUnspecified('ENUM_UNSPECIFIED');
+  enumOne('ENUM_ONE', 1),
+  enumTwo('ENUM_TWO', 2),
+  enumUnspecified('ENUM_UNSPECIFIED', 0);
 
   final String value;
-  const EinrideExampleSyntaxV1Enum(this.value);
+  /// proto 枚举数值（二进制 wire 编解码用，与 JSON 的 value 字符串互补）
+  final int wire;
+  const EinrideExampleSyntaxV1Enum(this.value, this.wire);
 
   static EinrideExampleSyntaxV1Enum fromString(String v) =>
     values.firstWhere((e) => e.value == v, orElse: () => throw ArgumentError('Unknown EinrideExampleSyntaxV1Enum value: ' + v));
+  static EinrideExampleSyntaxV1Enum fromWire(int v) =>
+    values.firstWhere((e) => e.wire == v, orElse: () => throw ArgumentError('Unknown EinrideExampleSyntaxV1Enum wire value: ' + v.toString()));
   @override
   String toString() => value;
 }
@@ -1048,17 +2074,58 @@ class EinrideExampleSyntaxV1Message$NestedMessage {
       string: string ?? this.string,
     );
   }
+
+  /// 二进制 proto 编码（MQTT 等二进制传输用；字段按编号升序写出）
+  Uint8List writeToBuffer() {
+    final w = ProtoWireWriter();
+    _writeTo(w);
+    return w.toBuffer();
+  }
+
+  void _writeTo(ProtoWireWriter w) {
+    // field 1: string
+    final f1 = string;
+    if (f1 != null) {
+      w.writeString(1, f1);
+    }
+  }
+
+  factory EinrideExampleSyntaxV1Message$NestedMessage.fromBuffer(List<int> bytes) {
+    return EinrideExampleSyntaxV1Message$NestedMessage._readFrom(ProtoWireReader(bytes));
+  }
+
+  static EinrideExampleSyntaxV1Message$NestedMessage _readFrom(ProtoWireReader r) {
+    final m = EinrideExampleSyntaxV1Message$NestedMessage();
+    while (r.next()) {
+      switch (r.fieldNumber) {
+        // field 1: string
+        case 1: {
+          m.string = r.readString();
+          break;
+        }
+        default: {
+          r.skip();
+        }
+      }
+    }
+    return m;
+  }
+
 }
 
 /// NestedEnum
 enum EinrideExampleSyntaxV1Message$NestedEnum {
-  nestedenumUnspecified('NESTEDENUM_UNSPECIFIED');
+  nestedenumUnspecified('NESTEDENUM_UNSPECIFIED', 0);
 
   final String value;
-  const EinrideExampleSyntaxV1Message$NestedEnum(this.value);
+  /// proto 枚举数值（二进制 wire 编解码用，与 JSON 的 value 字符串互补）
+  final int wire;
+  const EinrideExampleSyntaxV1Message$NestedEnum(this.value, this.wire);
 
   static EinrideExampleSyntaxV1Message$NestedEnum fromString(String v) =>
     values.firstWhere((e) => e.value == v, orElse: () => throw ArgumentError('Unknown EinrideExampleSyntaxV1Message\$NestedEnum value: ' + v));
+  static EinrideExampleSyntaxV1Message$NestedEnum fromWire(int v) =>
+    values.firstWhere((e) => e.wire == v, orElse: () => throw ArgumentError('Unknown EinrideExampleSyntaxV1Message\$NestedEnum wire value: ' + v.toString()));
   @override
   String toString() => value;
 }

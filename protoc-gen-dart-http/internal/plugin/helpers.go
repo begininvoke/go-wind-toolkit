@@ -159,8 +159,10 @@ func lowerFirst(s string) string {
 	return string(bytes)
 }
 
-// dartReservedWords is the set of Dart reserved words and built-in identifiers
-// that cannot be used as field names without escaping.
+// dartReservedWords is the set of Dart reserved words, built-in identifiers,
+// and dart:core type names that must be escaped when used as field names.
+// A field named bool/double/int/Map/... is a legal Dart identifier but
+// shadows the core type and poisons every later reference to it in the file.
 var dartReservedWords = map[string]bool{
 	"assert": true, "break": true, "case": true, "catch": true, "class": true,
 	"const": true, "continue": true, "default": true, "do": true, "else": true,
@@ -175,6 +177,13 @@ var dartReservedWords = map[string]bool{
 	"operator": true, "mixin": true, "part": true, "set": true, "static": true,
 	"typedef": true, "late": true, "required": true, "call": true, "await": true,
 	"yield": true, "sync": true, "async": true, "show": true,
+	// dart:core type names (lowercase builtins and core classes) —
+	// shadowing these breaks type references in generated code.
+	"bool": true, "double": true, "int": true, "num": true,
+	"String": true, "Map": true, "MapEntry": true, "List": true, "Set": true,
+	"Null": true, "Future": true, "Stream": true, "Iterator": true,
+	"Iterable": true, "Duration": true, "StringBuffer": true, "Symbol": true,
+	"Type": true,
 }
 
 // dartFieldName returns a safe Dart field name. If name is a Dart reserved

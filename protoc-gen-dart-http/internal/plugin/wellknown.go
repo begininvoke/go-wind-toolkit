@@ -68,6 +68,45 @@ func (wkt WellKnown) Name() string {
 	return "wellKnown" + shortName(string(wkt))
 }
 
+// isWireSupported reports whether the binary codec implements this well-known
+// type. Everything else (Any/Struct/Value/NullValue/ListValue and the
+// google.type composites) is deliberately unsupported and gets a runtime
+// throw instead of a codec that would disagree with the Dart-side type
+// mapping (e.g. NullValue maps to String but is an enum on the wire).
+func (wkt WellKnown) isWireSupported() bool {
+	switch wkt {
+	case WellKnownTimestamp,
+		WellKnownDuration,
+		WellKnownFieldMask,
+		WellKnownEmpty,
+		WellKnownInt32Value,
+		WellKnownInt64Value,
+		WellKnownUInt32Value,
+		WellKnownUInt64Value,
+		WellKnownBoolValue,
+		WellKnownStringValue,
+		WellKnownBytesValue,
+		WellKnownFloatValue,
+		WellKnownDoubleValue:
+		return true
+	default:
+		return false
+	}
+}
+
+// wireWriteUsesElement reports whether the WKT write call consumes the
+// element expression. Empty does not — an empty message carries no payload,
+// so the loop variable would otherwise be unused.
+func (wkt WellKnown) wireWriteUsesElement() bool {
+	return wkt != WellKnownEmpty
+}
+
+// wireUnsupportedStmt is the statement emitted for well-known types the
+// binary codec does not implement.
+func (wkt WellKnown) wireUnsupportedStmt() string {
+	return "throw UnsupportedError('dart-http wire: " + string(wkt) + " not supported');"
+}
+
 // DartType returns the Dart type that maps to this well-known type.
 func (wkt WellKnown) DartType() string {
 	switch wkt {

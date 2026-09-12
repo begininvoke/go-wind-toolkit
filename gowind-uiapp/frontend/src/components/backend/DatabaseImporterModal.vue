@@ -100,7 +100,6 @@ async function testConnection() {
     await formRef.value.validateFields(['dsn']);
 
     testLoading.value = true;
-    console.log('测试数据库连接:', formData);
 
     const result = await TestDatabaseConnection({
       useDSN: true,

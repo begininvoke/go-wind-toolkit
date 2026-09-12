@@ -19,7 +19,7 @@ import {
   DevBufGenerate, DevEntGenerate,
   DevWireGenerate, DevGoModTidy,
 } from '../../../wailsjs/go/main/App'
-import {EventsOn} from '../../../wailsjs/runtime'
+import {EventsOn, EventsOff} from '../../../wailsjs/runtime'
 
 const {t} = useI18n()
 
@@ -220,7 +220,9 @@ onMounted(async () => {
   } catch (e) { /* ignore */ }
 })
 
-onUnmounted(() => {})
+onUnmounted(() => {
+  EventsOff('project-opened')
+})
 </script>
 
 <template>

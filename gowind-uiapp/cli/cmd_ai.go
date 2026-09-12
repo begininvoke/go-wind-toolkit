@@ -45,7 +45,8 @@ func buildAIService(cmd *cobra.Command) *ai.Service {
 		cfg.Model = v
 	}
 	if cmd.Flags().Changed("temperature") {
-		if t, err := cmd.Flags().GetFloat64("temperature"); err == nil && t > 0 {
+		// 0 是合法取值(确定性输出),仅拒绝负数与超出 [0,2] 的值。
+		if t, err := cmd.Flags().GetFloat64("temperature"); err == nil && t >= 0 && t <= 2 {
 			cfg.Temperature = t
 		}
 	}

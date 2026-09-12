@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {ref, reactive} from 'vue'
+import {ref, reactive, onUnmounted} from 'vue'
 import {message} from 'ant-design-vue'
 import {useI18n} from 'vue-i18n'
 import {
@@ -37,7 +37,7 @@ import {
   SetDBConfig,
 } from "../../../wailsjs/go/main/App";
 import {generator, detect} from "../../../wailsjs/go/models";
-import {EventsOn} from "../../../wailsjs/runtime";
+import {EventsOn, EventsOff} from "../../../wailsjs/runtime";
 
 import DatabaseImporterModal from "./DatabaseImporterModal.vue";
 import SqlImporterModal from "./SqlImporterModal.vue";
@@ -493,6 +493,11 @@ EventsOn('table-imported', () => {
       currentStep.value = 1;
     }
   });
+})
+
+onUnmounted(() => {
+  EventsOff('project-opened')
+  EventsOff('table-imported')
 })
 </script>
 

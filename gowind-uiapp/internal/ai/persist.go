@@ -54,7 +54,9 @@ func LoadConfig() *Config {
 	if saved.Model != "" {
 		cfg.Model = saved.Model
 	}
-	if saved.Temperature > 0 {
+	// Temperature=0 是合法取值(确定性输出),不能当缺省回退到默认值;
+	// 仅排除负数与超出 [0,2] 的脏数据。
+	if saved.Temperature >= 0 && saved.Temperature <= 2 {
 		cfg.Temperature = saved.Temperature
 	}
 	if saved.MaxTokens > 0 {

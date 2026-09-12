@@ -43,18 +43,18 @@ const emit = defineEmits<{
 const editorRef = ref<HTMLDivElement>()
 let editor: monaco.editor.IStandaloneCodeEditor | null = null
 
+// 语言注册项的释放句柄;每次重新注册前与组件卸载时全部释放,
+// 避免补全/Monarch provider 随挂载与 dbType 切换无限叠加泄漏。
+const languageDisposables: monaco.IDisposable[] = []
+
+function disposeLanguageProviders() {
+  languageDisposables.forEach(d => d.dispose())
+  languageDisposables.length = 0
+}
+
 // 注册数据库特定的语法定义
 function registerDatabaseLanguage(dbType: string) {
-  // 卸载旧的语言定义（避免重复注册）
-  try {
-    monaco.languages.getLanguages().forEach(lang => {
-      if (lang.id === 'sql-custom') {
-        // Monaco 不支持直接卸载，通过覆盖方式处理
-      }
-    })
-  } catch (e) {
-    console.warn('清理语言定义时出错:', e)
-  }
+  disposeLanguageProviders()
 
   // 定义不同数据库的关键字
   const keywords: Record<string, string[]> = {
@@ -114,11 +114,11 @@ function registerDatabaseLanguage(dbType: string) {
 
   const selectedKeywords = keywords[dbType] || keywords.mysql
 
-  // 注册自定义 SQL 语言（覆盖默认）
+  // 注册自定义 SQL 语言（覆盖默认;register 本身无返回句柄,重复注册同 id 无害）
   monaco.languages.register({id: 'sql-custom'})
 
   // 配置语法高亮
-  monaco.languages.setMonarchTokensProvider('sql-custom', {
+  languageDisposables.push(monaco.languages.setMonarchTokensProvider('sql-custom', {
     tokenizer: {
       root: [
         // 关键字（区分大小写）
@@ -142,10 +142,10 @@ function registerDatabaseLanguage(dbType: string) {
         [/[\/*]/, 'comment']
       ]
     }
-  })
+  }))
 
   // 配置自动补全
-  monaco.languages.registerCompletionItemProvider('sql-custom', {
+  languageDisposables.push(monaco.languages.registerCompletionItemProvider('sql-custom', {
     provideCompletionItems: (model, position) => {
       const suggestions: monaco.languages.CompletionItem[] = []
 
@@ -201,7 +201,7 @@ function registerDatabaseLanguage(dbType: string) {
 
       return {suggestions}
     }
-  })
+  }))
 
 
   return 'sql-custom'
@@ -378,6 +378,7 @@ watch(() => props.dbType, async (newType) => {
 
 onUnmounted(() => {
   editor?.dispose()
+  disposeLanguageProviders()
 })
 
 // 暴露方法

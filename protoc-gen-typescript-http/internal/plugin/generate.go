@@ -5,7 +5,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http/internal/codegen"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"

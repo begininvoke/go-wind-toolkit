@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http/internal/codegen"
-	"github.com/tx7do/go-wind-toolkit/protoc-gen-typescript-http/internal/httprule"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 

@@ -23,7 +23,7 @@ func TestGenerate(t *testing.T) {
 		Servers:   []string{"rest", "grpc"},
 		DbClients: []string{"ent", "redis"},
 
-		OutputPath: "./test",
+		OutputPath: t.TempDir(),
 	})
 	assert.Nil(t, err)
 }

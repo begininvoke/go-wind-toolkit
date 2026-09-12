@@ -11,7 +11,7 @@ func TestYamlGenerator_Template_ServerYaml(t *testing.T) {
 	g := NewYamlGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 	}
 
 	if _, err := g.GenerateServerYaml(context.Background(), opts); err != nil {
@@ -23,7 +23,7 @@ func TestYamlGenerator_Template_ClientYaml(t *testing.T) {
 	g := NewYamlGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 	}
 
 	if _, err := g.GenerateClientYaml(context.Background(), opts); err != nil {
@@ -35,7 +35,7 @@ func TestYamlGenerator_Template_LoggerYaml(t *testing.T) {
 	g := NewYamlGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 	}
 
 	if _, err := g.GenerateLoggerYaml(context.Background(), opts); err != nil {
@@ -47,7 +47,7 @@ func TestYamlGenerator_Template_DataYaml(t *testing.T) {
 	g := NewYamlGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 	}
 
 	if _, err := g.GenerateDataYaml(context.Background(), opts); err != nil {

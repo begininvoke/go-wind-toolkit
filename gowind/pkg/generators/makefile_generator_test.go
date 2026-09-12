@@ -11,7 +11,7 @@ func TestMakefileGenerator_Template_AppMakefile(t *testing.T) {
 	g := NewMakefileGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 	}
 
 	if _, err := g.GenerateAppMakefile(context.Background(), opts); err != nil {

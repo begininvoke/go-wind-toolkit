@@ -23,7 +23,7 @@ func TestGenerate(t *testing.T) {
 		Servers:   []string{"rest", "grpc"},
 		DbClients: []string{"ent", "redis"},
 
-		OutputPath: "./test",
+		OutputPath: t.TempDir(),
 	})
 	assert.Nil(t, err)
 }
@@ -71,30 +71,31 @@ func TestHasBFFService(t *testing.T) {
 
 func TestAppendServiceName(t *testing.T) {
 	g := NewGenerator()
+	tmp := t.TempDir()
 
-	err := g.appendServiceName("./test", "test", "user", false)
+	err := g.appendServiceName(tmp, "test", "user", false)
 	assert.Nil(t, err)
 
-	err = g.appendServiceName("./test", "test", "order", false)
+	err = g.appendServiceName(tmp, "test", "order", false)
 	assert.Nil(t, err)
 
-	err = g.appendServiceName("./test", "test", "admin", true)
+	err = g.appendServiceName(tmp, "test", "admin", true)
 	assert.Nil(t, err)
 
-	err = g.appendServiceName("./test", "test", "front", true)
+	err = g.appendServiceName(tmp, "test", "front", true)
 	assert.Nil(t, err)
 }
 
 func TestWriteMakefile(t *testing.T) {
 	g := NewGenerator()
 
-	err := g.writeMakefile("./test")
+	err := g.writeMakefile(t.TempDir())
 	assert.Nil(t, err)
 }
 
 func TestWriteConfigs(t *testing.T) {
 	g := NewGenerator()
 
-	err := g.writeConfigs("./test/configs")
+	err := g.writeConfigs(t.TempDir())
 	assert.Nil(t, err)
 }

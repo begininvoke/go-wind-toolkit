@@ -13,7 +13,7 @@ func TestConverter(t *testing.T) {
 	sourceModuleName := "user"
 	moduleVersion := "v1"
 	serviceType := "grpc"
-	outputPath := "./api/protos"
+	outputPath := t.TempDir()
 	_, _ = Convert(
 		ctx,
 		&dsn,

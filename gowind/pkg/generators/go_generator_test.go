@@ -10,7 +10,7 @@ func TestGoGenerator_Template_Main(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":                  "user",
@@ -29,7 +29,7 @@ func TestGoGenerator_Template_Wire(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -45,7 +45,7 @@ func TestGoGenerator_Template_WireSet(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":      "user",
@@ -63,7 +63,7 @@ func TestGoGenerator_Template_EntClient(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output/client",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -79,7 +79,7 @@ func TestGoGenerator_Template_EntRepo(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":    "user",
@@ -97,7 +97,7 @@ func TestGoGenerator_Template_GormClient(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output/client",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -113,7 +113,7 @@ func TestGoGenerator_Template_GormInit(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir:     "./output/gorm",
+		OutDir:     t.TempDir(),
 		OutputName: "gorm_init.go",
 		Module:     "github.com/example/myproject",
 		Vars: map[string]any{
@@ -130,7 +130,7 @@ func TestGoGenerator_Template_GormRepo(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":    "user",
@@ -148,7 +148,7 @@ func TestGoGenerator_Template_GrpcServer(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":  "user",
@@ -167,7 +167,7 @@ func TestGoGenerator_Template_GrpcServer_NoPackages(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -183,7 +183,7 @@ func TestGoGenerator_Template_RestServer_NoPackages(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -199,7 +199,7 @@ func TestGoGenerator_Template_RedisClient(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output/client",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service": "user",
@@ -215,7 +215,7 @@ func TestGoGenerator_Template_RestServer(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"Service":  "admin",
@@ -233,7 +233,7 @@ func TestGoGenerator_Template_Service(t *testing.T) {
 	g := NewGoGenerator()
 
 	opts1 := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"TargetApiPackageName":    "user",
@@ -253,7 +253,7 @@ func TestGoGenerator_Template_Service(t *testing.T) {
 	}
 
 	opts2 := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Module: "github.com/example/myproject",
 		Vars: map[string]any{
 			"TargetApiPackageName":    "admin",

@@ -11,7 +11,7 @@ func TestProtoGenerator_Template_GrpcServiceProto(t *testing.T) {
 	g := NewProtoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Vars: map[string]any{
 			"Package":   "user.service.v1",
 			"Model":     "user",
@@ -33,7 +33,7 @@ func TestProtoGenerator_Template_RestServiceProto(t *testing.T) {
 	g := NewProtoGenerator()
 
 	opts := code_generator.Options{
-		OutDir: "./output",
+		OutDir: t.TempDir(),
 		Vars: map[string]any{
 			"TargetPackage": "admin.service.v1",
 			"SourcePackage": "user.service.v1",

@@ -36,7 +36,7 @@ func TestWriteGrpcServiceProto(t *testing.T) {
 		},
 	}
 
-	err := WriteGrpcServiceProto("./api/protos", data)
+	err := WriteGrpcServiceProto(t.TempDir(), data)
 	assert.Nil(t, err)
 }
 
@@ -49,6 +49,6 @@ func TestWriteRestServiceProto(t *testing.T) {
 		Comment:      "用户",
 	}
 
-	err := WriteRestServiceProto("./api/protos", data)
+	err := WriteRestServiceProto(t.TempDir(), data)
 	assert.Nil(t, err)
 }

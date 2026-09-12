@@ -125,7 +125,7 @@ func watchServices(root string, targets []watchTarget) error {
 			continue
 		}
 		m.binPath[t.name] = binPath
-		if err = build.BuildBinary(t.dir, binPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
+		if err = build.BuildBinary(m.ctx, t.dir, binPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: build for service '%s' failed: %s\033[m\n", t.name, err.Error())
 			continue
 		}
@@ -150,6 +150,27 @@ func watchServices(root string, targets []watchTarget) error {
 		return err
 	}
 
+	// 重建请求由单个工作 goroutine 串行执行:编译耗时远超防抖窗口,若在
+	// AfterFunc 的 goroutine 里直接执行 refresh,防抖窗内的新事件会调度出
+	// 并发的 refresh,同一服务的两个进程句柄互相覆盖、先启动者永远无人停
+	// 止,产生孤儿进程。
+	refreshCh := make(chan []string)
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case names := <-refreshCh:
+				for _, name := range names {
+					if ctx.Err() != nil {
+						return
+					}
+					m.refresh(name)
+				}
+			}
+		}
+	}()
+
 	// 事件合并:静默期内的新事件重置计时器;到期后一次性处理积压的受影响服务。
 	var mu sync.Mutex
 	pending := map[string]bool{}
@@ -165,11 +186,12 @@ func watchServices(root string, targets []watchTarget) error {
 		mu.Unlock()
 
 		sort.Strings(names)
-		for _, name := range names {
-			if ctx.Err() != nil {
-				return
-			}
-			m.refresh(name)
+		if ctx.Err() != nil {
+			return
+		}
+		select {
+		case refreshCh <- names:
+		case <-ctx.Done():
 		}
 	}
 	resetDebounce := func() {
@@ -279,9 +301,11 @@ func newWatchManager(ctx context.Context, root string, targets []watchTarget) *w
 }
 
 // start 拉起服务进程并登记;进程退出由唯一的 goroutine Wait 并按需告警。
+// 进程绑定到管理器的 ctx:信号上下文取消时由 exec 撤销,不会在 Ctrl+C
+// 与重建竞态时留下无人管理的进程。
 func (m *watchManager) start(t watchTarget) error {
 	configPath := filepath.Join(t.dir, "configs")
-	proc := exec.Command(m.binPath[t.name], "-c", configPath)
+	proc := exec.CommandContext(m.ctx, m.binPath[t.name], "-c", configPath)
 	proc.Dir = t.dir
 	if m.prefixed {
 		proc.Stdout = newPrefixedWriter(os.Stdout, t.name, &m.outMu)
@@ -356,7 +380,11 @@ func (m *watchManager) stopAll() {
 
 // refresh 重建并重启单个服务。先编译到临时路径(Windows 不允许覆写运行中的
 // exe),编译成功才停旧、换新、再启动;编译失败保持旧进程不动。
+// 仅由 watchServices 的单工作 goroutine 串行调用。
 func (m *watchManager) refresh(name string) {
+	if m.ctx.Err() != nil {
+		return
+	}
 	t, ok := m.byName[name]
 	if !ok {
 		return
@@ -367,17 +395,25 @@ func (m *watchManager) refresh(name string) {
 	}
 
 	tmpPath := binPath + ".next"
-	if err := build.BuildBinary(t.dir, tmpPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
+	if err := build.BuildBinary(m.ctx, t.dir, tmpPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: rebuild for service '%s' failed, keeping old process: %s\033[m\n", name, err.Error())
 		return
 	}
 
 	m.stop(name)
 
+	// 停止可能恰逢 Ctrl+C:主循环的 stopAll 已跑完,此处不得再拉起新进程。
+	if m.ctx.Err() != nil {
+		_ = os.Remove(tmpPath)
+		return
+	}
+
 	if err := os.Remove(binPath); err != nil && !os.IsNotExist(err) {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[33mWARNING: replace binary for service '%s': %s\033[m\n", name, err.Error())
 	}
 	if err := os.Rename(tmpPath, binPath); err != nil {
+		// 清理残留的临时产物,避免 bin/ 下遗留 .next 文件。
+		_ = os.Remove(tmpPath)
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: swap binary for service '%s' failed: %s\033[m\n", name, err.Error())
 		return
 	}

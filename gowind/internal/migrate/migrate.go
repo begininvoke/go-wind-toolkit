@@ -1,11 +1,13 @@
 package migrate
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -26,6 +28,9 @@ var (
 // dumpToolDir 临时 dump 程序的目录名(位于模块根目录下,跑完即删)。
 // 使用普通名字而非 ./_ 前缀,保证 `go run ./...` 显式路径在所有 Go 版本可用。
 const dumpToolDir = "gow-migrate-tmp"
+
+// migrateRunTimeout 临时 dump/diff 程序的执行超时上限,防止其挂死整个 CLI。
+const migrateRunTimeout = 15 * time.Minute
 
 // CmdMigrate migrate 命令:把服务的 ent schema 逆向为 SQL DDL。
 var CmdMigrate = &cobra.Command{
@@ -77,7 +82,7 @@ func RunDump(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err
@@ -100,7 +105,7 @@ func RunDump(cmd *cobra.Command, args []string) error {
 
 	failed := false
 	for _, name := range names {
-		outPath, err := dumpService(inspector, name, dialect)
+		outPath, err := dumpService(cmd.Context(), inspector, name, dialect)
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: dump DDL for service '%s' failed: %s\033[m\n", name, err.Error())
 			failed = true
@@ -159,7 +164,7 @@ func hasEntSchema(root string, name string) bool {
 }
 
 // dumpService 把单个服务的 ent schema 导出为 DDL 文件,返回输出路径。
-func dumpService(inspector *pkg.ModuleInspector, name string, dialect string) (string, error) {
+func dumpService(ctx context.Context, inspector *pkg.ModuleInspector, name string, dialect string) (string, error) {
 	svcDir := filepath.Join(inspector.Root, "app", name, "service")
 	entRoot := filepath.Join(svcDir, "internal", "data", "ent")
 
@@ -169,7 +174,7 @@ func dumpService(inspector *pkg.ModuleInspector, name string, dialect string) (s
 
 	// schema.DDL 消费 ent/migrate 包里的表定义;代码尚未生成时自动补齐。
 	if _, err := os.Stat(filepath.Join(entRoot, "migrate", "schema.go")); err != nil {
-		if err = ent.GenerateService(svcDir); err != nil {
+		if err = ent.GenerateService(ctx, svcDir); err != nil {
 			return "", fmt.Errorf("ent codegen required for migrate package: %w", err)
 		}
 	}
@@ -202,8 +207,8 @@ func dumpService(inspector *pkg.ModuleInspector, name string, dialect string) (s
 
 	// go run 以服务目录为工作目录:模块自服务目录向上解析,同时满足
 	// internal 包的可见性规则(导入方必须在 <svc>/... 子树内)。
-	g := pkg.NewGoCmd(svcDir)
-	runErr := g.Run("run", "./"+dumpToolDir, outPath, dialect, dbVersion)
+	g := pkg.NewGoCmdWithTimeout(svcDir, migrateRunTimeout)
+	runErr := g.Run(ctx, "run", "./"+dumpToolDir, outPath, dialect, dbVersion)
 
 	// 成功即清理;失败保留现场便于排查,并在错误信息里给出路径。
 	if runErr != nil {
@@ -353,7 +358,7 @@ func versionedService(cmd *cobra.Command, inspector *pkg.ModuleInspector, name, 
 	// 先重新生成 ent 代码。
 	data, err := os.ReadFile(migratePkg)
 	if err != nil || !strings.Contains(string(data), "func NamedDiff(") {
-		if err = ent.GenerateService(svcDir); err != nil {
+		if err = ent.GenerateService(cmd.Context(), svcDir); err != nil {
 			return "", fmt.Errorf("ent codegen required for versioned migrations: %w", err)
 		}
 	}
@@ -403,8 +408,8 @@ func versionedService(cmd *cobra.Command, inspector *pkg.ModuleInspector, name, 
 	if err != nil {
 		return "", err
 	}
-	g := pkg.NewGoCmd(svcDir)
-	runErr := g.Run("run", "./"+dumpToolDir, devURLFlag, sanitizeMigName(nameFlag), absMigDir)
+	g := pkg.NewGoCmdWithTimeout(svcDir, migrateRunTimeout)
+	runErr := g.Run(cmd.Context(), "run", "./"+dumpToolDir, devURLFlag, sanitizeMigName(nameFlag), absMigDir)
 
 	if runErr != nil {
 		return "", fmt.Errorf("versioned diff program failed (kept at %s): %w", programPath, runErr)

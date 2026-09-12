@@ -58,20 +58,6 @@ func extractProjectName(module string) string {
 	return module
 }
 
-// splitList 展开每个元素内的逗号分隔写法("-s a,b" 等价 "-s a -s b")。
-func splitList(list []string) []string {
-	var out []string
-	for _, item := range list {
-		for _, part := range strings.Split(item, ",") {
-			part = strings.TrimSpace(part)
-			if part != "" {
-				out = append(out, part)
-			}
-		}
-	}
-	return out
-}
-
 func Run(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		prompt := &survey.Input{
@@ -87,10 +73,10 @@ func Run(cmd *cobra.Command, args []string) error {
 	}
 
 	// 逗号分隔写法(-s grpc,rest)与重复 flag 写法(-s grpc -s rest)等价。
-	Servers = splitList(Servers)
-	DbClients = splitList(DbClients)
+	Servers = pkg.SplitFlagList(Servers)
+	DbClients = pkg.SplitFlagList(DbClients)
 
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
 		return fmt.Errorf("failed to inspect module: %w", err)
 	}

@@ -1,10 +1,12 @@
 ﻿package pkg
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // ModuleInspector 保存项目根目录和模块名。
@@ -15,7 +17,7 @@ type ModuleInspector struct {
 
 // NewModuleInspectorFromGo 使用 `go list -m -json` 在 startDir（或当前目录）执行，
 // 返回模块路径和项目根目录。若在 startDir 执行失败，会向上遍历父目录重试。
-func NewModuleInspectorFromGo(startDir string) (*ModuleInspector, error) {
+func NewModuleInspectorFromGo(ctx context.Context, startDir string) (*ModuleInspector, error) {
 	if startDir == "" {
 		wd, err := os.Getwd()
 		if err != nil {
@@ -24,8 +26,8 @@ func NewModuleInspectorFromGo(startDir string) (*ModuleInspector, error) {
 		startDir = wd
 	}
 
-	g := NewGoCmd("")
-	out, err := g.RunUpwardUntilSucceeds(startDir, "list", "-m", "-json")
+	g := NewGoCmdWithTimeout("", 5*time.Minute)
+	out, err := g.RunUpwardUntilSucceeds(ctx, startDir, "list", "-m", "-json")
 	if err != nil {
 		return nil, err
 	}
@@ -41,8 +43,8 @@ func NewModuleInspectorFromGo(startDir string) (*ModuleInspector, error) {
 	root := info.Dir
 	if root == "" {
 		// 兜底：使用 go env GOMOD 推断
-		g2 := NewGoCmd("")
-		if goModOut, e := g2.Output("env", "GOMOD"); e == nil {
+		g2 := NewGoCmdWithTimeout("", 30*time.Second)
+		if goModOut, e := g2.Output(ctx, "env", "GOMOD"); e == nil {
 			goMod := strings.TrimSpace(string(goModOut))
 			if goMod != "" {
 				root = filepath.Dir(goMod)

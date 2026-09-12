@@ -35,8 +35,8 @@ func NewEntCmd(targetDir string) *EntCmd {
 
 // tryGoRunFirst 尝试在项目中通过 `go run entgo.io/ent/cmd/ent ...` 执行命令（向上查找可执行目录）。
 // 成功时打印输出并返回 nil；失败时返回最后一次错误以便调用方决定后续处理。
-func (e *EntCmd) tryGoRunFirst(args ...string) error {
-	out, err := e.goCmd.RunUpwardUntilSucceeds("", args...)
+func (e *EntCmd) tryGoRunFirst(ctx context.Context, args ...string) error {
+	out, err := e.goCmd.RunUpwardUntilSucceeds(ctx, "", args...)
 	if err == nil {
 		// 打印 combined output（stdout+stderr）
 		if len(out) > 0 {
@@ -48,23 +48,23 @@ func (e *EntCmd) tryGoRunFirst(args ...string) error {
 }
 
 // runGlobalEntIfAvailable 尝试在 PATH 中查找全局 `ent` 可执行程序并执行（遵循 e.Timeout）。
-func (e *EntCmd) runGlobalEntIfAvailable(args ...string) error {
+func (e *EntCmd) runGlobalEntIfAvailable(ctx context.Context, args ...string) error {
 	entPath, err := exec.LookPath("ent")
 	if err != nil {
 		return fmt.Errorf("no local go-run ent succeeded and no global ent found: %w", err)
 	}
 
-	// 准备上下文（带超时）
-	var ctx context.Context
+	// 准备上下文（调用方 ctx 叠加 e.Timeout 超时）
+	var runCtx context.Context
 	var cancel context.CancelFunc
 	if e.Timeout > 0 {
-		ctx, cancel = context.WithTimeout(context.Background(), e.Timeout)
+		runCtx, cancel = context.WithTimeout(ctx, e.Timeout)
 	} else {
-		ctx, cancel = context.WithCancel(context.Background())
+		runCtx, cancel = context.WithCancel(ctx)
 	}
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, entPath, args...)
+	cmd := exec.CommandContext(runCtx, entPath, args...)
 
 	// 将工作目录设置为 `e.TargetDir` 的绝对路径
 	if e.TargetDir != "" {
@@ -89,7 +89,7 @@ func (e *EntCmd) runGlobalEntIfAvailable(args ...string) error {
 }
 
 // RunNew 使用优先使用项目内的 go run，如果失败则尝试全局 ent 可执行程序来执行 `ent new`。
-func (e *EntCmd) RunNew(names []string) error {
+func (e *EntCmd) RunNew(ctx context.Context, names []string) error {
 	if len(names) == 0 {
 		return errors.New("at least one schema name is required")
 	}
@@ -101,18 +101,18 @@ func (e *EntCmd) RunNew(names []string) error {
 	goArgs := []string{"run", "entgo.io/ent/cmd/ent", "new"}
 	goArgs = append(goArgs, names...)
 
-	if err := e.tryGoRunFirst(goArgs...); err == nil {
+	if err := e.tryGoRunFirst(ctx, goArgs...); err == nil {
 		return nil
 	}
 
 	// 如果 go run 不可用，则尝试全局 ent
 	entArgs := append([]string{"new"}, names...)
-	return e.runGlobalEntIfAvailable(entArgs...)
+	return e.runGlobalEntIfAvailable(ctx, entArgs...)
 }
 
 // RunGenerate 使用优先使用项目内的 go run，如果失败则尝试全局 ent 可执行程序来执行 `ent generate`。
 // extraArgs 可传入像 `--feature` 这样的额外参数。
-func (e *EntCmd) RunGenerate(extraArgs ...string) error {
+func (e *EntCmd) RunGenerate(ctx context.Context, extraArgs ...string) error {
 	targetDir := e.TargetDir
 	if targetDir == "" {
 		targetDir = "."
@@ -125,7 +125,7 @@ func (e *EntCmd) RunGenerate(extraArgs ...string) error {
 	goArgs = append(goArgs, targetDir)
 
 	// 尝试 go run first
-	if err := e.tryGoRunFirst(goArgs...); err == nil {
+	if err := e.tryGoRunFirst(ctx, goArgs...); err == nil {
 		return nil
 	}
 
@@ -135,5 +135,5 @@ func (e *EntCmd) RunGenerate(extraArgs ...string) error {
 		entArgs = append(entArgs, extraArgs...)
 	}
 	entArgs = append(entArgs, targetDir)
-	return e.runGlobalEntIfAvailable(entArgs...)
+	return e.runGlobalEntIfAvailable(ctx, entArgs...)
 }

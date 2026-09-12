@@ -2,7 +2,6 @@ package generate
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/AlecAivazis/survey/v2"
@@ -18,7 +17,8 @@ var CmdGenerate = &cobra.Command{
 	Aliases: []string{"gen"},
 	Short:   "generate CRUD code from database schema",
 	Long:    "Generate complete Kratos microservice code (proto, ORM, service, server, wiring, config) from an existing database or SQL file. Module registration follows the target service form: anchor injection into hand-written wiring.go, or wire provider sets for legacy services. Example: gow generate",
-	Run:     run,
+	RunE:         Run,
+	SilenceUsage: true,
 }
 
 var (
@@ -55,7 +55,7 @@ func init() {
 	CmdGenerate.Flags().BoolVarP(&genDryRun, "dry-run", "n", false, "Validate the data source, resolve tables and preview the plan without writing anything")
 }
 
-func run(cmd *cobra.Command, args []string) {
+func Run(cmd *cobra.Command, args []string) error {
 	// 交互式获取缺失参数
 	if genDSN == "" {
 		prompt := &survey.Input{
@@ -63,7 +63,7 @@ func run(cmd *cobra.Command, args []string) {
 			Help:    "Database connection string, e.g. mysql://user:pass@tcp(localhost:3306)/dbname",
 		}
 		if err := survey.AskOne(prompt, &genDSN); err != nil || genDSN == "" {
-			return
+			return nil
 		}
 	}
 
@@ -73,15 +73,14 @@ func run(cmd *cobra.Command, args []string) {
 			Help:    "The service/module name to generate code for.",
 		}
 		if err := survey.AskOne(prompt, &genServiceName); err != nil || genServiceName == "" {
-			return
+			return nil
 		}
 	}
 
 	// 获取项目信息
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return
+		return err
 	}
 
 	projectName := extractProjectName(inspector.ModPath)
@@ -94,6 +93,9 @@ func run(cmd *cobra.Command, args []string) {
 
 	// 构建 DSN 前缀（如果用户没有提供 scheme）
 	dsn := genDSN
+
+	// 逗号分隔写法(-s grpc,rest)与重复 flag 写法(-s grpc -s rest)等价。
+	genServers = pkg.SplitFlagList(genServers)
 
 	opts := sqlkratos.GeneratorOptions{
 		Driver:           genDriver,
@@ -124,8 +126,7 @@ func run(cmd *cobra.Command, args []string) {
 	if genDryRun {
 		tables, terr := sqlkratos.PlanTables(cmd.Context(), opts)
 		if terr != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: resolve tables: %s\033[m\n", terr.Error())
-			return
+			return fmt.Errorf("resolve tables: %w", terr)
 		}
 		fmt.Printf("Plan for service [%s]:\n", genServiceName)
 		fmt.Printf("  Source:      %s (driver: %s)\n", dsn, genDriver)
@@ -158,15 +159,15 @@ func run(cmd *cobra.Command, args []string) {
 			fmt.Printf("    - %s (%d field(s))%s\n", t.Name, len(t.Fields), note)
 		}
 		fmt.Printf("\033[36m[DRY-RUN] preview only — nothing was written. Re-run without --dry-run to execute.\033[m\n")
-		return
+		return nil
 	}
 
 	if err := sqlkratos.Generate(cmd.Context(), opts); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return
+		return err
 	}
 
 	fmt.Printf("\033[32mService [%s] generated successfully!\033[m\n", genServiceName)
+	return nil
 }
 
 func extractProjectName(module string) string {

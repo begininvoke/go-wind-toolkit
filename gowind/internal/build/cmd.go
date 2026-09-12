@@ -1,11 +1,13 @@
 package build
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -43,7 +45,8 @@ Version stamping: generated service main packages declare "var version" —
 --version injects it via -ldflags "-X main.version=...". --ldflags passes
 extra flags through verbatim; --strip adds "-s -w" (smaller binaries);
 --trimpath removes local filesystem paths from the binary.`,
-	Run: Run,
+	RunE:         Run,
+	SilenceUsage: true,
 }
 
 func init() {
@@ -63,29 +66,26 @@ type buildTarget struct {
 	explicit bool
 }
 
-// Run 为 cobra 的 Run 回调:编译目标服务/目标平台组合。
-func Run(cmd *cobra.Command, args []string) {
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+// Run 为 cobra 的 RunE 回调:编译目标服务/目标平台组合。
+func Run(cmd *cobra.Command, args []string) error {
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return
+		return err
 	}
 
 	// 先在模块根目录运行 `go mod tidy`
 	if err = pkg.GoModTidy(cmd.Context(), inspector.Root); err != nil {
-		return
+		return err
 	}
 
 	names, err := resolveServiceNames(inspector.Root, args)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return
+		return err
 	}
 
 	targets, err := resolveTargets()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return
+		return err
 	}
 
 	opts := OptionsFromFlags()
@@ -100,7 +100,7 @@ func Run(cmd *cobra.Command, args []string) {
 				failed = true
 				continue
 			}
-			if err = BuildBinary(serviceDir, outPath, target.goos, target.goarch, opts); err != nil {
+			if err = BuildBinary(cmd.Context(), serviceDir, outPath, target.goos, target.goarch, opts); err != nil {
 				_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: build for service '%s' (%s/%s) failed: %s\033[m\n", name, target.goos, target.goarch, err.Error())
 				failed = true
 				continue
@@ -109,8 +109,9 @@ func Run(cmd *cobra.Command, args []string) {
 		}
 	}
 	if failed {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: one or more build targets failed\033[m\n")
+		return fmt.Errorf("one or more build targets failed")
 	}
+	return nil
 }
 
 // resolveServiceNames 解析目标服务列表:无参数时枚举全部有效服务,否则逐个校验。
@@ -147,8 +148,8 @@ func resolveServiceNames(root string, args []string) ([]string, error) {
 // resolveTargets 解析构建目标组合。未指定 os/arch 时为单一原生目标;
 // 指定任一即进入显式模式,做 GOOS×GOARCH 全组合。
 func resolveTargets() ([]buildTarget, error) {
-	oss := splitFlagList(targetOS)
-	archs := splitFlagList(targetArch)
+	oss := pkg.SplitFlagList(targetOS)
+	archs := pkg.SplitFlagList(targetArch)
 
 	if len(oss) == 0 && len(archs) == 0 {
 		return []buildTarget{{goos: runtime.GOOS, goarch: runtime.GOARCH, explicit: false}}, nil
@@ -167,20 +168,6 @@ func resolveTargets() ([]buildTarget, error) {
 		}
 	}
 	return targets, nil
-}
-
-// splitFlagList 展开逗号分隔的旗标取值列表。
-func splitFlagList(list []string) []string {
-	var out []string
-	for _, item := range list {
-		for _, part := range strings.Split(item, ",") {
-			part = strings.TrimSpace(part)
-			if part != "" {
-				out = append(out, part)
-			}
-		}
-	}
-	return out
 }
 
 // ResolveOutputPath 决定产物路径:默认各服务 bin/,--out 时集中到单目录;
@@ -258,13 +245,16 @@ func (o BuildOptions) buildArgs(outPath string) []string {
 	return append(args, "./cmd/server")
 }
 
+// buildTimeout 单次服务构建的超时上限,防止 go build 挂死整个 CLI。
+const buildTimeout = 10 * time.Minute
+
 // BuildBinary 编译服务主程序为独立二进制。goos/goarch 为目标平台,
 // 与宿主一致即原生构建。输出路径须为绝对路径。
-func BuildBinary(serviceDir string, outPath string, goos string, goarch string, opts BuildOptions) error {
-	g := pkg.NewGoCmd(serviceDir)
+func BuildBinary(ctx context.Context, serviceDir string, outPath string, goos string, goarch string, opts BuildOptions) error {
+	g := pkg.NewGoCmdWithTimeout(serviceDir, buildTimeout)
 	g.Env = []string{
 		"GOOS=" + goos,
 		"GOARCH=" + goarch,
 	}
-	return g.Run(opts.buildArgs(outPath)...)
+	return g.Run(ctx, opts.buildArgs(outPath)...)
 }

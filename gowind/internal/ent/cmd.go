@@ -1,6 +1,7 @@
 package ent
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 func RunGenerate(cmd *cobra.Command, args []string) error {
 	cmdArgs, _ := pkg.SplitArgs(cmd, args)
 
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err
@@ -63,11 +64,11 @@ func RunGenerate(cmd *cobra.Command, args []string) error {
 
 	// 如果没有传入 service 或者为空，则遍历所有 service
 	if len(serviceName) == 0 {
-		return generateEntAllService(inspector.Root)
+		return generateEntAllService(cmd.Context(), inspector.Root)
 	}
 
 	servicePath := filepath.Join(inspector.Root, "app", serviceName, "service")
-	err = generateEnt(servicePath)
+	err = generateEnt(cmd.Context(), servicePath)
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: generate for service %s failed: %v\033[m\n", serviceName, err)
 		return err
@@ -78,7 +79,7 @@ func RunGenerate(cmd *cobra.Command, args []string) error {
 }
 
 // generateEntAllService 在模块根目录下查找 app 目录，并对其中每个包含 internal/data/ent/schema 的服务目录执行 generateEnt。
-func generateEntAllService(projectRootPath string) error {
+func generateEntAllService(ctx context.Context, projectRootPath string) error {
 	appDir := filepath.Join(projectRootPath, "app")
 	entries, err := os.ReadDir(appDir)
 	if err != nil {
@@ -103,7 +104,7 @@ func generateEntAllService(projectRootPath string) error {
 		}
 
 		processed++
-		if genErr := generateEnt(servicePath); genErr != nil {
+		if genErr := generateEnt(ctx, servicePath); genErr != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: generate for service %s failed: %v\033[m\n", serviceName, genErr)
 			lastErr = genErr
 		} else {
@@ -119,10 +120,10 @@ func generateEntAllService(projectRootPath string) error {
 }
 
 // generateEnt 在指定服务目录下执行 ent code generation，要求该目录下存在 internal/data/ent/schema 目录。
-func generateEnt(serviceRootPath string) error {
+func generateEnt(ctx context.Context, serviceRootPath string) error {
 	target := filepath.Join(serviceRootPath, "internal", "data", "ent", "schema")
 	e := NewEntCmd(target)
-	return e.RunGenerate(
+	return e.RunGenerate(ctx,
 		"--feature", "privacy",
 		"--feature", "entql",
 		"--feature", "sql/modifier",
@@ -135,8 +136,8 @@ func generateEnt(serviceRootPath string) error {
 
 // GenerateService 为指定服务执行 ent code generation，供其他命令（如 migrate）
 // 在缺少 ent/migrate 包时自动补齐。要求服务目录下存在 internal/data/ent/schema。
-func GenerateService(serviceRootPath string) error {
-	return generateEnt(serviceRootPath)
+func GenerateService(ctx context.Context, serviceRootPath string) error {
+	return generateEnt(ctx, serviceRootPath)
 }
 
 func RunAdd(cmd *cobra.Command, args []string) error {
@@ -174,7 +175,7 @@ func RunAdd(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("no valid schema names after parsing")
 	}
 
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err
@@ -186,12 +187,12 @@ func RunAdd(cmd *cobra.Command, args []string) error {
 	target := filepath.Join(servicePath, "internal", "data")
 
 	e := NewEntCmd(target)
-	if err = e.RunNew(names); err != nil {
+	if err = e.RunNew(cmd.Context(), names); err != nil {
 		return err
 	}
 
 	// 新增 schema 后立即重新生成 ent 运行时,保证代码可直接编译使用。
-	if err = generateEnt(servicePath); err != nil {
+	if err = generateEnt(cmd.Context(), servicePath); err != nil {
 		return fmt.Errorf("regenerate ent code: %w", err)
 	}
 

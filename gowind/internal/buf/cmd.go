@@ -21,7 +21,7 @@ const (
 )
 
 func RunGenerate(cmd *cobra.Command, args []string) error {
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err
@@ -31,12 +31,6 @@ func RunGenerate(cmd *cobra.Command, args []string) error {
 	if err = pkg.GoModTidy(cmd.Context(), inspector.Root); err != nil {
 		return err
 	}
-
-	// 确保 buf 已安装
-	ensureBufInstalled(cmd.Context())
-
-	printBufVersion(cmd.Context())
-	printProtocVersion(cmd.Context())
 
 	apiPath := filepath.Join(inspector.Root, "api")
 	if !isDirExists(apiPath) {
@@ -50,7 +44,10 @@ func RunGenerate(cmd *cobra.Command, args []string) error {
 // GenerateFromPath 从指定路径生成 Protobuf 代码。
 func GenerateFromPath(ctx context.Context, apiPath string) error {
 	// 确保 buf 已安装
-	ensureBufInstalled(ctx)
+	if err := ensureBufInstalled(ctx); err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
+		return err
+	}
 
 	if !isDirExists(apiPath) {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: api directory does not exist: %s\033[m\n", apiPath)
@@ -171,16 +168,22 @@ func checkBufInstalled(ctx context.Context) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// ensureBufInstalled 检查 buf 是否已安装，若未安装则尝试通过 go install 安装。
-func ensureBufInstalled(ctx context.Context) {
+// ensureBufInstalled 检查 buf 是否已安装，若未安装则尝试通过 go install 安装，
+// 并在安装后复检其确实可用。安装失败或安装后仍不可用均返回错误。
+func ensureBufInstalled(ctx context.Context) error {
 	if _, err := checkBufInstalled(ctx); err == nil {
-		//fmt.Printf("buf is already installed: %s\n", ver)
-		return
+		return nil
 	}
 
 	fmt.Println("Installing buf...")
 
-	_ = pkg.GoInstall("github.com/bufbuild/buf/cmd/buf@latest")
+	if err := pkg.GoInstall(ctx, "github.com/bufbuild/buf/cmd/buf@latest"); err != nil {
+		return fmt.Errorf("failed to install buf: %w", err)
+	}
+	if _, err := checkBufInstalled(ctx); err != nil {
+		return fmt.Errorf("buf still unavailable after installation: %w", err)
+	}
+	return nil
 }
 
 // isBufLockExists 检查 apiPath 下是否存在 `buf.lock` 文件。
@@ -201,24 +204,4 @@ func isBufConfigExists(apiPath string) bool {
 		return false
 	}
 	return !info.IsDir()
-}
-
-// printBufVersion 检查 buf 是否安装，并打印版本信息或错误消息。
-func printBufVersion(ctx context.Context) {
-	if ver, err := checkBufInstalled(ctx); err == nil {
-		fmt.Printf("buf version: %s\n", ver)
-	} else {
-		fmt.Printf("buf is not installed: %s\n", err.Error())
-	}
-}
-
-// printProtocVersion 检查 protoc 是否安装，并打印版本信息或错误消息。
-func printProtocVersion(ctx context.Context) {
-	cmd := exec.CommandContext(ctx, "protoc", "--version")
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("protoc is not installed: %s\n", err.Error())
-		return
-	}
-	fmt.Printf("protoc version: %s\n", strings.TrimSpace(string(out)))
 }

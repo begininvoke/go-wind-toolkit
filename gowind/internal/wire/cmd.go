@@ -17,7 +17,7 @@ import (
 func RunGenerate(cmd *cobra.Command, args []string) error {
 	cmdArgs, _ := pkg.SplitArgs(cmd, args)
 
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err

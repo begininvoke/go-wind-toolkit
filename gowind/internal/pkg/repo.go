@@ -32,8 +32,14 @@ func repoDir(url string) string {
 	if err != nil {
 		host = vcsURL.Host
 	}
-	for _, p := range unExpandVarPath {
-		host = strings.TrimLeft(host, p)
+	// Blank path-traversal-looking host segments ("~", ".", "..") by exact
+	// match so they never contribute to the cache directory name. A TrimLeft
+	// here would strip arbitrary leading characters instead of whole segments.
+	for _, seg := range unExpandVarPath {
+		if host == seg {
+			host = ""
+			break
+		}
 	}
 	dir := path.Base(path.Dir(vcsURL.Path))
 	url = fmt.Sprintf("%s/%s", host, dir)
@@ -51,18 +57,17 @@ func NewRepo(url string, branch string) *Repo {
 
 // Path returns the repository cache path.
 func (r *Repo) Path() string {
-	start := strings.LastIndex(r.url, "/")
-	end := strings.LastIndex(r.url, ".git")
-	if end == -1 {
-		end = len(r.url)
-	}
+	// Repo name = last path segment of the URL with a ".git" suffix removed.
+	// Derived via path.Base so the extraction can never go out of slice
+	// bounds, regardless of where ".git" or "/" appear in the URL.
+	repo := strings.TrimSuffix(path.Base(strings.TrimSuffix(r.url, "/")), ".git")
 	var branch string
 	if r.branch == "" {
 		branch = "@main"
 	} else {
 		branch = "@" + r.branch
 	}
-	return path.Join(r.home, r.url[start+1:end]+branch)
+	return path.Join(r.home, repo+branch)
 }
 
 // Pull fetch the repository from remote url.

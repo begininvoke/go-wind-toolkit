@@ -38,22 +38,22 @@ With --watch the started services are watched: saving a .go/.yaml/.proto
 source rebuilds and restarts only the affected services (all of them for
 changes in shared module-level code). A failed rebuild keeps the old
 process running.`,
-	Run:   Run,
+	RunE:          Run,
+	SilenceUsage:  true,
 }
 
 // Run service.
-func Run(cmd *cobra.Command, args []string) {
+func Run(cmd *cobra.Command, args []string) error {
 	cmdArgs, _ := pkg.SplitArgs(cmd, args)
 
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return
+		return err
 	}
 
 	// 先在模块根目录运行 `go mod tidy`
 	if err = pkg.GoModTidy(cmd.Context(), inspector.Root); err != nil {
-		return
+		return err
 	}
 
 	var serviceName string
@@ -61,131 +61,99 @@ func Run(cmd *cobra.Command, args []string) {
 	if len(cmdArgs) > 0 {
 		serviceName = strings.TrimSpace(cmdArgs[0])
 		if serviceName == "" {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: service name is required\033[m\n")
-			return
+			return fmt.Errorf("service name is required")
 		}
 
-		var valid bool
-		valid, err = pkg.IsValidServiceName(inspector.Root, serviceName)
+		valid, err := pkg.IsValidServiceName(inspector.Root, serviceName)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-			return
+			return err
 		}
-
 		if !valid {
-			err = fmt.Errorf("service '%s' does not exist or is not valid (missing cmd/server or configs)", serviceName)
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-			return
+			return fmt.Errorf("service '%s' does not exist or is not valid (missing cmd/server or configs)", serviceName)
 		}
 	} else {
 		// 未指定服务名称，检查当前目录是否为服务目录
 
-		var wd string
-		wd, err = os.Getwd()
+		wd, err := os.Getwd()
 		if err != nil {
-			fmt.Printf("os.Getwd error: %v\n", err)
+			return fmt.Errorf("os.Getwd: %w", err)
 		}
 
-		var hasCmd, hasConfigs bool
-		hasCmd, hasConfigs, err = pkg.HasCmdAndConfigs(wd)
+		hasCmd, hasConfigs, err := pkg.HasCmdAndConfigs(wd)
 		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-			return
+			return err
 		}
-
-		//log.Printf("[%s] hasCmd: %v, hasConfigs: %v\n", wd, hasCmd, hasConfigs)
 
 		if hasCmd && hasConfigs {
 			// 当前目录即为服务目录
 			if watchEnabled {
-				if err = watchServices(inspector.Root, []watchTarget{{
+				return watchServices(inspector.Root, []watchTarget{{
 					name: deriveWatchServiceName(wd),
 					dir:  wd,
-				}}); err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-				}
-				return
+				}})
 			}
-			if err = runService(wd); err != nil {
-				return
-			}
-			return
+			return runService(wd)
 		}
 
 		// 当前目录不是服务目录:枚举并一并运行模块内全部服务。
-		names, listErr := pkg.ListServiceNames(inspector.Root)
-		if listErr != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", listErr.Error())
-			return
+		names, err := pkg.ListServiceNames(inspector.Root)
+		if err != nil {
+			return err
 		}
 		if len(names) == 0 {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: no valid services found under %s\033[m\n", filepath.Join(inspector.Root, "app"))
-			return
+			return fmt.Errorf("no valid services found under %s", filepath.Join(inspector.Root, "app"))
 		}
 		if watchEnabled {
 			targets := make([]watchTarget, 0, len(names))
 			for _, name := range names {
 				targets = append(targets, watchTarget{name: name, dir: filepath.Join(inspector.Root, "app", name, "service")})
 			}
-			if err = watchServices(inspector.Root, targets); err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-			}
-			return
+			return watchServices(inspector.Root, targets)
 		}
-		if err = runAllServices(inspector.Root, names); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		}
-		return
+		return runAllServices(inspector.Root, names)
 	}
 
 	if watchEnabled {
-		if err = watchServices(inspector.Root, []watchTarget{{
+		return watchServices(inspector.Root, []watchTarget{{
 			name: serviceName,
 			dir:  filepath.Join(inspector.Root, "app", serviceName, "service"),
-		}}); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		}
-		return
+		}})
 	}
 
 	servicePath := path.Join(inspector.Root, "/app/", serviceName, "/service")
 
-	if err = runService(servicePath); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-	}
+	return runService(servicePath)
 }
 
-// runService 运行服务，使用命令: go run ./cmd/server -c ./configs。
+// runService 运行单个服务:先编译服务二进制再直接执行。
+// 直接执行二进制(而非 go run)使终止语义精确——SIGINT/SIGTERM 经信号
+// 上下文由 exec 撤销的就是服务进程本身,不会留下 go run 包装进程已死、
+// 服务进程仍存的孤儿(与 runAllServices 同一语义)。
 func runService(serviceWorkPath string) error {
-	// 使用 pkg.NewGoCmd 执行 go run . [programArgs...]
-	g := pkg.NewGoCmd(serviceWorkPath)
-	g.Stdout = os.Stdout
-	g.Stderr = os.Stderr
+	// 信号上下文:中断/终止时由 exec 撤销子进程(编译阶段一并覆盖)。
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
-	// 构建并规范化路径
-	appPath := filepath.Join(serviceWorkPath, "cmd", "server")
-	appPathAbs, err := filepath.Abs(appPath)
+	name := deriveWatchServiceName(serviceWorkPath)
+	binPath, err := build.ResolveOutputPath(name, serviceWorkPath, runtime.GOOS, runtime.GOARCH, false)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err
 	}
-	appPathAbs = filepath.Clean(appPathAbs)
-
-	configPath := filepath.Join(serviceWorkPath, "configs")
-	configPathAbs, err := filepath.Abs(configPath)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return err
-	}
-	configPathAbs = filepath.Clean(configPathAbs)
-
-	runArgs := []string{"run", appPathAbs, "-c", configPathAbs}
-
-	if err = g.Run(runArgs...); err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
+	if err = build.BuildBinary(sigCtx, serviceWorkPath, binPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
 		return err
 	}
 
+	proc := exec.CommandContext(sigCtx, binPath, "-c", filepath.Join(serviceWorkPath, "configs"))
+	proc.Dir = serviceWorkPath
+	proc.Stdout = os.Stdout
+	proc.Stderr = os.Stderr
+	if err := proc.Start(); err != nil {
+		return fmt.Errorf("failed to start service: %w", err)
+	}
+
+	// 服务退出或信号到达前保持前台;取消后 exec 已杀掉子进程,等待回收。
+	<-sigCtx.Done()
+	_ = proc.Wait()
 	return nil
 }
 
@@ -200,6 +168,11 @@ func runAllServices(root string, names []string) error {
 		binPath string
 	}
 
+	// 信号上下文:中断/终止时由 exec 撤销全部子进程。置于编译阶段之前,
+	// 使 Ctrl+C 同样能中断卡住的构建。
+	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	// 阶段一:编译全部服务(任一失败即中止,不启动任何进程)。
 	procs := make([]serviceProc, 0, len(names))
 	for _, name := range names {
@@ -208,15 +181,11 @@ func runAllServices(root string, names []string) error {
 		if err != nil {
 			return fmt.Errorf("resolve output for service '%s' failed: %w", name, err)
 		}
-		if err = build.BuildBinary(svcDir, binPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
+		if err = build.BuildBinary(sigCtx, svcDir, binPath, runtime.GOOS, runtime.GOARCH, build.BuildOptions{}); err != nil {
 			return fmt.Errorf("build for service '%s' failed: %w", name, err)
 		}
 		procs = append(procs, serviceProc{name: name, svcDir: svcDir, binPath: binPath})
 	}
-
-	// 信号上下文:中断/终止时由 exec 撤销全部子进程。
-	sigCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	// 阶段二:并发拉起全部服务。
 	// 终止语义:SIGINT/SIGTERM 撤销信号上下文,exec.CommandContext 随之杀掉各子进程;

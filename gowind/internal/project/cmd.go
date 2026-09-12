@@ -53,14 +53,7 @@ func canReach(addr string, d time.Duration) bool {
 func init() {
 	timeout = "60s"
 
-	// 优先使用 GitHub，若不可达则回退到 Gitee
-	if canReach("github.com:443", 3*time.Second) {
-		repoURL = GithubRepoURL
-	} else {
-		repoURL = GiteeRepoURL
-	}
-
-	CmdProject.Flags().StringVarP(&repoURL, "repo-url", "r", repoURL, "layout repo")
+	CmdProject.Flags().StringVarP(&repoURL, "repo-url", "r", GithubRepoURL, "layout repo")
 	CmdProject.Flags().StringVarP(&branch, "branch", "b", branch, "repo branch")
 	CmdProject.Flags().StringVarP(&timeout, "timeout", "t", timeout, "time out")
 	CmdProject.Flags().StringVarP(&moduleName, "module", "m", moduleName, "set go module name, if not set, use project name")
@@ -68,9 +61,15 @@ func init() {
 }
 
 func Run(cmd *cobra.Command, args []string) error {
-	wd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+	// Default endpoint (no explicit -r): prefer GitHub, fall back to Gitee if
+	// unreachable. Probed here rather than in init() so unrelated commands
+	// don't pay a blocking network round-trip on startup.
+	if !cmd.Flags().Changed("repo-url") {
+		if canReach("github.com:443", 3*time.Second) {
+			repoURL = GithubRepoURL
+		} else {
+			repoURL = GiteeRepoURL
+		}
 	}
 
 	t, err := time.ParseDuration(timeout)
@@ -99,7 +98,7 @@ func Run(cmd *cobra.Command, args []string) error {
 		name = args[0]
 	}
 
-	projectName, workingDir := processProjectParams(name, wd)
+	projectName, workingDir := processProjectParams(name)
 
 	if isDirExists(workingDir, projectName) {
 		fmt.Printf("🚫 %s already exists\n", projectName)

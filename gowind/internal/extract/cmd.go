@@ -94,7 +94,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("at least one object name is required, use --obj <name>")
 	}
 
-	inspector, err := pkg.NewModuleInspectorFromGo("")
+	inspector, err := pkg.NewModuleInspectorFromGo(cmd.Context(), "")
 	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
 		return err

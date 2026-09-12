@@ -33,27 +33,21 @@ func isDirExists(baseDir, projectName string) bool {
 }
 
 // processProjectParams process project name and working dir.
-func processProjectParams(projectName string, workingDir string) (projectNameResult, workingDirResult string) {
-	_projectDir := projectName
-	_workingDir := workingDir
-	// Process ProjectModule with system variable
-	if strings.HasPrefix(projectName, "~") {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			// cannot get user home return fallback place dir
-			return _projectDir, _workingDir
+//
+// "~/name" expands to the user home directory; a bare "~" or "~name" is
+// treated as a literal relative path like any other. The result is resolved
+// to an absolute path and split into (base, dir) = (project name, parent dir).
+func processProjectParams(projectName string) (projectNameResult, workingDirResult string) {
+	dir := projectName
+	if strings.HasPrefix(projectName, "~/") {
+		if homeDir, err := os.UserHomeDir(); err == nil {
+			dir = filepath.Join(homeDir, strings.TrimPrefix(projectName, "~/"))
 		}
-		_projectDir = filepath.Join(homeDir, projectName[2:])
 	}
-
-	// check path is relative
-	if !filepath.IsAbs(projectName) {
-		absPath, err := filepath.Abs(projectName)
-		if err != nil {
-			return _projectDir, _workingDir
+	if !filepath.IsAbs(dir) {
+		if absPath, err := filepath.Abs(dir); err == nil {
+			dir = absPath
 		}
-		_projectDir = absPath
 	}
-
-	return filepath.Base(_projectDir), filepath.Dir(_projectDir)
+	return filepath.Base(dir), filepath.Dir(dir)
 }

@@ -1,9 +1,12 @@
-﻿package pkg
+package pkg
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestNewModuleInspectorFromGo(t *testing.T) {
-	inspector, err := NewModuleInspectorFromGo("")
+	inspector, err := NewModuleInspectorFromGo(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
 	}

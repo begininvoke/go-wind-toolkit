@@ -41,19 +41,20 @@ func (g *GoCmd) prepareEnv() []string {
 	return env
 }
 
-// makeContext 返回基于 g.Timeout 的 context。
-func (g *GoCmd) makeContext() (context.Context, context.CancelFunc) {
+// makeContext 返回基于调用方 ctx 与 g.Timeout 的 context:
+// Timeout > 0 时叠加超时(调用方取消同样生效),否则原样传递调用方 ctx。
+func (g *GoCmd) makeContext(ctx context.Context) (context.Context, context.CancelFunc) {
 	if g.Timeout > 0 {
-		return context.WithTimeout(context.Background(), g.Timeout)
+		return context.WithTimeout(ctx, g.Timeout)
 	}
-	return context.WithCancel(context.Background())
+	return context.WithCancel(ctx)
 }
 
 // Run 直接执行 go 命令，输出到 GoCmd 指定的 Stdout/Stderr（或终端）。
-func (g *GoCmd) Run(args ...string) error {
+func (g *GoCmd) Run(ctx context.Context, args ...string) error {
 	fmt.Printf("go %s\n", joinArgs(args))
 
-	ctx, cancel := g.makeContext()
+	ctx, cancel := g.makeContext(ctx)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "go", args...)
@@ -78,8 +79,8 @@ func (g *GoCmd) Run(args ...string) error {
 }
 
 // Output 执行并返回 stdout（不包含 stderr）。
-func (g *GoCmd) Output(args ...string) ([]byte, error) {
-	ctx, cancel := g.makeContext()
+func (g *GoCmd) Output(ctx context.Context, args ...string) ([]byte, error) {
+	ctx, cancel := g.makeContext(ctx)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "go", args...)
@@ -94,8 +95,8 @@ func (g *GoCmd) Output(args ...string) ([]byte, error) {
 }
 
 // CombinedOutput 执行并返回 stdout+stderr。
-func (g *GoCmd) CombinedOutput(args ...string) ([]byte, error) {
-	ctx, cancel := g.makeContext()
+func (g *GoCmd) CombinedOutput(ctx context.Context, args ...string) ([]byte, error) {
+	ctx, cancel := g.makeContext(ctx)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "go", args...)
@@ -111,7 +112,7 @@ func (g *GoCmd) CombinedOutput(args ...string) ([]byte, error) {
 
 // RunUpwardUntilSucceeds 从 startDir 开始向上遍历父目录，尝试执行 go 命令，
 // 直到某一目录执行成功或到达根目录。返回最后一次成功的输出（combined）。
-func (g *GoCmd) RunUpwardUntilSucceeds(startDir string, args ...string) ([]byte, error) {
+func (g *GoCmd) RunUpwardUntilSucceeds(ctx context.Context, startDir string, args ...string) ([]byte, error) {
 	dir := startDir
 	if dir == "" {
 		wd, err := os.Getwd()
@@ -122,7 +123,7 @@ func (g *GoCmd) RunUpwardUntilSucceeds(startDir string, args ...string) ([]byte,
 	}
 	for {
 		g.Dir = dir
-		out, err := g.CombinedOutput(args...)
+		out, err := g.CombinedOutput(ctx, args...)
 		if err == nil {
 			return out, nil
 		}
@@ -149,13 +150,13 @@ func joinArgs(args []string) string {
 
 // GoInstall 使用 `go install` 安装指定路径的包。
 // 若路径中不包含版本号，则默认使用 @latest。
-func GoInstall(paths ...string) error {
+func GoInstall(ctx context.Context, paths ...string) error {
 	for _, p := range paths {
 		if !containsAt(p) {
 			p += "@latest"
 		}
-		g := NewGoCmd("")
-		if err := g.Run("install", p); err != nil {
+		g := NewGoCmdWithTimeout("", 5*time.Minute)
+		if err := g.Run(ctx, "install", p); err != nil {
 			return err
 		}
 	}

@@ -24,7 +24,8 @@ var CmdProject = &cobra.Command{
 	Short:   "create a new project scaffold",
 	Long:    "Create a project using the repository template. Example: gow new project helloworld",
 	Args:    cobra.ExactArgs(1),
-	Run:     run,
+	RunE:    Run,
+	SilenceUsage: true,
 }
 
 var (
@@ -66,15 +67,15 @@ func init() {
 	CmdProject.Flags().BoolVarP(&nomod, "nomod", "", nomod, "retain go mod")
 }
 
-func run(cmd *cobra.Command, args []string) {
+func Run(cmd *cobra.Command, args []string) error {
 	wd, err := os.Getwd()
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("failed to get working directory: %w", err)
 	}
 
 	t, err := time.ParseDuration(timeout)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("invalid timeout value %q: %w", timeout, err)
 	}
 
 	parentCtx := cmd.Context()
@@ -92,7 +93,7 @@ func run(cmd *cobra.Command, args []string) {
 		}
 		err = survey.AskOne(prompt, &name)
 		if err != nil || name == "" {
-			return
+			return nil
 		}
 	} else {
 		name = args[0]
@@ -109,15 +110,15 @@ func run(cmd *cobra.Command, args []string) {
 		var override bool
 		e := survey.AskOne(prompt, &override)
 		if e != nil {
-			return
+			return nil
 		}
 		if !override {
-			return
+			return nil
 		}
 		_ = os.RemoveAll(filepath.Join(workingDir, projectName))
 	}
 
-	fmt.Printf("🚀 Creating service %s, layout repo is %s, please wait a moment.\n\n", projectName, repoURL)
+	fmt.Printf("🚀 Creating project %s, layout repo is %s, please wait a moment.\n\n", projectName, repoURL)
 
 	p := &Project{
 		Name:   projectName,
@@ -139,11 +140,11 @@ func run(cmd *cobra.Command, args []string) {
 			return
 		}
 
-		packagePath, e := filepath.Rel(projectRoot, filepath.Join(workingDir, projectName))
-		if e != nil {
-			done <- fmt.Errorf("🚫 failed to get relative path: %v", err)
-			return
-		}
+			packagePath, e := filepath.Rel(projectRoot, filepath.Join(workingDir, projectName))
+			if e != nil {
+				done <- fmt.Errorf("🚫 failed to get relative path: %v", e)
+				return
+			}
 		packagePath = strings.ReplaceAll(packagePath, "\\", "/")
 
 		mod, e := pkg.ModulePath(filepath.Join(projectRoot, "go.mod"))
@@ -159,25 +160,24 @@ func run(cmd *cobra.Command, args []string) {
 	select {
 	case <-ctx.Done():
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			_, _ = fmt.Fprint(os.Stderr, "\033[31mERROR: project creation timed out\033[m\n")
-			return
+			return fmt.Errorf("project creation timed out")
 		}
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: failed to create project(%s)\033[m\n", ctx.Err().Error())
+		return fmt.Errorf("failed to create project: %w", ctx.Err())
 
-	case err = <-done:
-		if err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: Failed to create project(%s)\033[m\n", err.Error())
+	case createErr := <-done:
+		if createErr != nil {
+			return fmt.Errorf("failed to create project: %w", createErr)
 		}
 
 		if err = pkg.GoModTidy(ctx, filepath.Join(workingDir, projectName)); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: failed to run `go mod tidy`: %s\033[m\n", err.Error())
-			return
+			return fmt.Errorf("failed to run `go mod tidy`: %w", err)
 		}
 
 		if err = buf.GenerateFromPath(ctx, filepath.Join(workingDir, projectName, "api")); err != nil {
-			return
+			return fmt.Errorf("failed to generate api code: %w", err)
 		}
 
 		fmt.Printf("✅ Project %s created successfully at %s\n", projectName, filepath.Join(workingDir, projectName))
+		return nil
 	}
 }

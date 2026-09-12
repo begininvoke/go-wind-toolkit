@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"os"
 	"path"
 	"strings"
 
@@ -18,7 +17,8 @@ var CmdService = &cobra.Command{
 	Short:   "create a new service scaffold",
 	Long:    "Create a new microservice inside the current workspace. Example: gow new service user",
 	Args:    cobra.ExactArgs(1),
-	Run:     run,
+	RunE:    Run,
+	SilenceUsage: true,
 }
 
 var (
@@ -72,7 +72,7 @@ func splitList(list []string) []string {
 	return out
 }
 
-func run(cmd *cobra.Command, args []string) {
+func Run(cmd *cobra.Command, args []string) error {
 	if len(args) == 0 {
 		prompt := &survey.Input{
 			Message: "What is service name?",
@@ -80,7 +80,7 @@ func run(cmd *cobra.Command, args []string) {
 		}
 		err := survey.AskOne(prompt, &serviceName)
 		if err != nil || serviceName == "" {
-			return
+			return nil
 		}
 	} else {
 		serviceName = args[0]
@@ -92,15 +92,13 @@ func run(cmd *cobra.Command, args []string) {
 
 	inspector, err := pkg.NewModuleInspectorFromGo("")
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: %s\033[m\n", err.Error())
-		return
+		return fmt.Errorf("failed to inspect module: %w", err)
 	}
 
 	servicePath := path.Join(inspector.Root, "/app/", serviceName, "/service")
 
 	if pkg.IsDirExists(servicePath) {
-		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: Service directory %s already exists\033[m\n", servicePath)
-		return
+		return fmt.Errorf("service directory %s already exists", servicePath)
 	}
 
 	if dryRun {
@@ -125,14 +123,14 @@ func run(cmd *cobra.Command, args []string) {
 			fmt.Printf("      internal/server/%s_server.go\n", srv)
 		}
 		fmt.Printf("      internal/service/  (business services)\n")
-		for _, cli := range DbClients {
-			fmt.Printf("      internal/data/client/%s_client.go\n", cli)
+			for _, cli := range DbClients {
+				fmt.Printf("      internal/data/client/%s_client.go\n", cli)
+			}
+			fmt.Printf("\033[36m[DRY-RUN] preview only — nothing was created.\033[m\n")
+			return nil
 		}
-		fmt.Printf("\033[36m[DRY-RUN] preview only — nothing was created.\033[m\n")
-		return
-	}
 
-	_ = Generate(cmd.Context(), GeneratorOptions{
+		return Generate(cmd.Context(), GeneratorOptions{
 		GenerateMain:     true,
 		GenerateServer:   true,
 		GenerateService:  true,

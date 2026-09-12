@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
+
 	"github.com/tx7do/go-wind-toolkit/gowind/internal/service"
 )
 
@@ -13,14 +16,12 @@ var addCmd = &cobra.Command{
 		if len(args) == 0 {
 			return cmd.Help()
 		}
-		switch args[0] {
-		case "service", "svc":
-			return cmd.Help()
-		default:
-			service.CmdService.Run(service.CmdService, args)
-			return nil
+		if len(args) > 1 {
+			return fmt.Errorf("too many arguments: expected 1 service name, got %d", len(args))
 		}
+		return service.Run(cmd, args)
 	},
+	SilenceUsage: true,
 }
 
 func init() {

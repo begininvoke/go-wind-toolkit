@@ -37,10 +37,6 @@ func main() {
 		Bind: []any{
 			app,
 		},
-		Debug: options.Debug{
-			OpenInspectorOnStartup: true,
-		},
-		DisablePanicRecovery: true,
 	})
 
 	if err != nil {

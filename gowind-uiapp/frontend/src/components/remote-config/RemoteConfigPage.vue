@@ -66,6 +66,11 @@ const remoteConfig = reactive({
   group: '',
   env: '',
   namespaceId: '',
+  username: '',
+  password: '',
+  caCertPem: '',
+  clientCertPem: '',
+  clientKeyPem: '',
 })
 
 function handleTypeChange() {
@@ -230,6 +235,45 @@ loadConfigTypes()
                 <a-input
                     v-model:value="remoteConfig.namespaceId"
                     :placeholder="t('remoteConfig.config.namespaceIdPlaceholder')"
+                />
+              </a-form-item>
+            </template>
+
+            <template v-if="remoteConfig.type === 'etcd' || remoteConfig.type === 'nacos'">
+              <a-form-item :label="t('remoteConfig.config.username')">
+                <a-input
+                    v-model:value="remoteConfig.username"
+                    :placeholder="t('remoteConfig.config.usernamePlaceholder')"
+                />
+              </a-form-item>
+              <a-form-item :label="t('remoteConfig.config.password')">
+                <a-input-password
+                    v-model:value="remoteConfig.password"
+                    :placeholder="t('remoteConfig.config.passwordPlaceholder')"
+                />
+              </a-form-item>
+            </template>
+
+            <template v-if="remoteConfig.type === 'etcd'">
+              <a-form-item :label="t('remoteConfig.config.caCert')">
+                <a-textarea
+                    v-model:value="remoteConfig.caCertPem"
+                    :placeholder="t('remoteConfig.config.caCertPlaceholder')"
+                    :auto-size="{minRows: 3, maxRows: 6}"
+                />
+              </a-form-item>
+              <a-form-item :label="t('remoteConfig.config.clientCert')">
+                <a-textarea
+                    v-model:value="remoteConfig.clientCertPem"
+                    :placeholder="t('remoteConfig.config.clientCertPlaceholder')"
+                    :auto-size="{minRows: 3, maxRows: 6}"
+                />
+              </a-form-item>
+              <a-form-item :label="t('remoteConfig.config.clientKey')">
+                <a-textarea
+                    v-model:value="remoteConfig.clientKeyPem"
+                    :placeholder="t('remoteConfig.config.clientKeyPlaceholder')"
+                    :auto-size="{minRows: 3, maxRows: 6}"
                 />
               </a-form-item>
             </template>

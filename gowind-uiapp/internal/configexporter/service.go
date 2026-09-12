@@ -2,6 +2,9 @@ package configexporter
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -32,6 +35,15 @@ type RemoteConfig struct {
 	Group       string     `json:"group"`       // Nacos 分组
 	Env         string     `json:"env"`         // Nacos 环境
 	NamespaceId string     `json:"namespaceId"` // Nacos 命名空间
+
+	// 凭据(可选)。Etcd: gRPC 用户名/密码;Nacos: 登录接口换取 accessToken。
+	Username string `json:"username"`
+	Password string `json:"password"`
+
+	// Etcd TLS(可选,PEM 文本): 自定义 CA / 客户端证书 / 客户端私钥。
+	CaCertPem     string `json:"caCertPem"`
+	ClientCertPem string `json:"clientCertPem"`
+	ClientKeyPem  string `json:"clientKeyPem"`
 }
 
 // ServiceInfo 服务信息
@@ -109,22 +121,14 @@ func GetSupportedTypes() []map[string]string {
 
 // ExportAll 导出所有服务配置到远程配置中心
 // 通过直接读取配置文件并写入配置中心来实现
-func ExportAll(
-	typeName string,
-	endpoint string,
-	projectName string,
-	projectRoot string,
-	group string,
-	env string,
-	namespaceId string,
-) error {
+func ExportAll(rc *RemoteConfig, projectRoot string) error {
 	services, err := GetServiceList(projectRoot)
 	if err != nil {
 		return err
 	}
 
 	for _, svc := range services {
-		if err := ExportOne(typeName, endpoint, projectName, projectRoot, group, env, namespaceId, svc.Name); err != nil {
+		if err := ExportOne(rc, projectRoot, svc.Name); err != nil {
 			return fmt.Errorf("导出服务 %s 失败: %w", svc.Name, err)
 		}
 	}
@@ -133,31 +137,13 @@ func ExportAll(
 }
 
 // ExportOne 导出单个服务的配置到远程配置中心
-func ExportOne(
-	typeName string,
-	endpoint string,
-	projectName string,
-	projectRoot string,
-	group string,
-	env string,
-	namespaceId string,
-	serviceName string,
-) error {
+func ExportOne(rc *RemoteConfig, projectRoot string, serviceName string) error {
 	// 使用内建实现直接通过 HTTP API 写入配置中心
-	return exportDirect(typeName, endpoint, projectName, projectRoot, group, env, namespaceId, serviceName)
+	return exportDirect(rc, projectRoot, serviceName)
 }
 
 // exportDirect 直接通过 SDK 写入配置中心（简化实现）
-func exportDirect(
-	typeName string,
-	endpoint string,
-	projectName string,
-	projectRoot string,
-	group string,
-	env string,
-	namespaceId string,
-	serviceName string,
-) error {
+func exportDirect(rc *RemoteConfig, projectRoot string, serviceName string) error {
 	configFolder := GetServiceConfigFolder(projectRoot, serviceName)
 	files := getConfigFileList(configFolder)
 	if len(files) == 0 {
@@ -177,15 +163,15 @@ func exportDirect(
 	mergedContent := strings.Join(allContent, "\n")
 
 	// 根据类型写入不同的配置中心
-	switch ConfigType(typeName) {
+	switch rc.Type {
 	case Consul:
-		return writeConsul(endpoint, projectName, serviceName, mergedContent)
+		return writeConsul(rc.Endpoint, rc.ProjectName, serviceName, mergedContent)
 	case Etcd:
-		return writeEtcd(endpoint, projectName, serviceName, mergedContent)
+		return writeEtcd(rc, serviceName, mergedContent)
 	case Nacos:
-		return writeNacos(endpoint, projectName, serviceName, group, env, namespaceId, mergedContent)
+		return writeNacos(rc, serviceName, mergedContent)
 	default:
-		return fmt.Errorf("不支持的配置中心类型: %s", typeName)
+		return fmt.Errorf("不支持的配置中心类型: %s", rc.Type)
 	}
 }
 
@@ -249,16 +235,32 @@ func writeConsul(endpoint, project, app, content string) error {
 
 // writeEtcd 写入配置到 Etcd (v3 gRPC 协议)。
 // key 约定与 Consul 一致: <project>/<app>/service/config
-func writeEtcd(endpoint, project, app, content string) error {
-	endpoints := normalizeEtcdEndpoints(endpoint)
+// rc.Username/rc.Password 提供 gRPC 认证;rc.*Pem 提供自定义 CA 与客户端
+// 证书(见 buildTLSConfig)。
+func writeEtcd(rc *RemoteConfig, app, content string) error {
+	endpoints := normalizeEtcdEndpoints(rc.Endpoint)
 	if len(endpoints) == 0 {
 		return fmt.Errorf("Etcd endpoint 为空")
 	}
 
-	cli, err := clientv3.New(clientv3.Config{
+	tlsCfg, err := buildTLSConfig(rc.CaCertPem, rc.ClientCertPem, rc.ClientKeyPem)
+	if err != nil {
+		return fmt.Errorf("Etcd TLS 配置无效: %w", err)
+	}
+
+	cfg := clientv3.Config{
 		Endpoints:   endpoints,
 		DialTimeout: 5 * time.Second,
-	})
+	}
+	if rc.Username != "" {
+		cfg.Username = rc.Username
+		cfg.Password = rc.Password
+	}
+	if tlsCfg != nil {
+		cfg.TLS = tlsCfg
+	}
+
+	cli, err := clientv3.New(cfg)
 	if err != nil {
 		return fmt.Errorf("连接 Etcd 失败: %w", err)
 	}
@@ -267,11 +269,43 @@ func writeEtcd(endpoint, project, app, content string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	key := fmt.Sprintf("%s/%s/service/config", project, app)
+	key := fmt.Sprintf("%s/%s/service/config", rc.ProjectName, app)
 	if _, err := cli.Put(ctx, key, content); err != nil {
 		return fmt.Errorf("写入 Etcd 失败: %w", err)
 	}
 	return nil
+}
+
+// buildTLSConfig 由可选的 PEM 文本构建 etcd 客户端 TLS 配置:
+//   - ca 非空: 解析为根证书池(自定义 CA)
+//   - cert/key 非空: 解析为客户端证书对(mTLS)
+//   - 全部为空: 返回 (nil, nil),表示使用系统默认
+//
+// 任何一段 PEM 无法解析即报错;cert 与 key 必须成对出现。
+func buildTLSConfig(ca, cert, key string) (*tls.Config, error) {
+	if ca == "" && cert == "" && key == "" {
+		return nil, nil
+	}
+	if (cert == "") != (key == "") {
+		return nil, fmt.Errorf("客户端证书与私钥必须成对提供")
+	}
+
+	cfg := &tls.Config{}
+	if ca != "" {
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM([]byte(ca)) {
+			return nil, fmt.Errorf("CA 证书 PEM 解析失败")
+		}
+		cfg.RootCAs = pool
+	}
+	if cert != "" {
+		pair, err := tls.X509KeyPair([]byte(cert), []byte(key))
+		if err != nil {
+			return nil, fmt.Errorf("客户端证书对解析失败: %w", err)
+		}
+		cfg.Certificates = []tls.Certificate{pair}
+	}
+	return cfg, nil
 }
 
 // normalizeEtcdEndpoints 归一化 endpoint 为 etcd 要求的 "host:port" 列表:
@@ -290,8 +324,13 @@ func normalizeEtcdEndpoints(endpoint string) []string {
 	return out
 }
 
-// writeNacos 写入配置到 Nacos
-func writeNacos(endpoint, project, app, group, env, namespaceId, content string) error {
+// writeNacos 写入配置到 Nacos。
+// rc.Username/rc.Password 非空时先走登录接口换取 accessToken,并随发布
+// 请求一并提交(服务端关闭鉴权时凭据可留空,行为与之前一致)。
+func writeNacos(rc *RemoteConfig, app, content string) error {
+	group := rc.Group
+	env := rc.Env
+	namespaceId := rc.NamespaceId
 	if group == "" {
 		group = "DEFAULT_GROUP"
 	}
@@ -302,14 +341,27 @@ func writeNacos(endpoint, project, app, group, env, namespaceId, content string)
 		namespaceId = "public"
 	}
 
-	dataId := fmt.Sprintf("%s-%s-service-%s.yaml", project, app, env)
-	nacosURL := fmt.Sprintf("http://%s/nacos/v1/cs/configs", endpoint)
+	scheme := "http"
+	if ep := rc.Endpoint; strings.HasPrefix(ep, "https://") {
+		scheme = "https"
+	}
+
+	dataId := fmt.Sprintf("%s-%s-service-%s.yaml", rc.ProjectName, app, env)
+	nacosURL := fmt.Sprintf("%s://%s/nacos/v1/cs/configs", scheme, strings.TrimPrefix(strings.TrimPrefix(rc.Endpoint, "https://"), "http://"))
 
 	form := url.Values{}
 	form.Set("dataId", dataId)
 	form.Set("group", group)
 	form.Set("tenant", namespaceId)
 	form.Set("content", content)
+
+	if rc.Username != "" && rc.Password != "" {
+		token, err := nacosLogin(rc.Endpoint, rc.Username, rc.Password)
+		if err != nil {
+			return err
+		}
+		form.Set("accessToken", token)
+	}
 
 	resp, err := http.PostForm(nacosURL, form)
 	if err != nil {
@@ -326,4 +378,34 @@ func writeNacos(endpoint, project, app, group, env, namespaceId, content string)
 		return fmt.Errorf("Nacos 发布配置失败: %s", string(body))
 	}
 	return nil
+}
+
+// nacosLogin 走 Nacos 登录接口换取 accessToken。
+func nacosLogin(endpoint, username, password string) (string, error) {
+	scheme := "http"
+	if strings.HasPrefix(endpoint, "https://") {
+		scheme = "https"
+	}
+	loginURL := fmt.Sprintf("%s://%s/nacos/v1/auth/login", scheme, strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://"))
+
+	resp, err := http.PostForm(loginURL, url.Values{
+		"username": {username},
+		"password": {password},
+	})
+	if err != nil {
+		return "", fmt.Errorf("Nacos 登录请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("Nacos 登录失败 (%d)", resp.StatusCode)
+	}
+
+	var out struct {
+		AccessToken string `json:"accessToken"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil || out.AccessToken == "" {
+		return "", fmt.Errorf("Nacos 登录响应无效")
+	}
+	return out.AccessToken, nil
 }

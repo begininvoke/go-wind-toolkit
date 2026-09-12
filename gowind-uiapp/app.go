@@ -616,15 +616,7 @@ func (a *App) ExportConfigToRemote(cfg ce.RemoteConfig) *ce.ExportResult {
 		return &ce.ExportResult{Success: false, Error: errMsg}
 	}
 
-	err := ce.ExportAll(
-		string(cfg.Type),
-		cfg.Endpoint,
-		cfg.ProjectName,
-		a.projectInfo.Root,
-		cfg.Group,
-		cfg.Env,
-		cfg.NamespaceId,
-	)
+	err := ce.ExportAll(&cfg, a.projectInfo.Root)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "导出配置失败: %v", err)
 		return &ce.ExportResult{Success: false, Error: err.Error()}
@@ -717,16 +709,7 @@ func (a *App) ExportOneServiceConfig(cfg ce.RemoteConfig, serviceName string) *c
 		return &ce.ExportResult{Success: false, Error: errMsg}
 	}
 
-	err := ce.ExportOne(
-		string(cfg.Type),
-		cfg.Endpoint,
-		cfg.ProjectName,
-		a.projectInfo.Root,
-		cfg.Group,
-		cfg.Env,
-		cfg.NamespaceId,
-		serviceName,
-	)
+	err := ce.ExportOne(&cfg, a.projectInfo.Root, serviceName)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "导出服务 %s 配置失败: %v", serviceName, err)
 		return &ce.ExportResult{Success: false, Error: err.Error(), Service: serviceName}

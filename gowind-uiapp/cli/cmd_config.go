@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -54,6 +55,30 @@ Etcd endpoint 支持 host:port 或 http(s)://host:port，逗号分隔多节点�
 			Group:       flagString(cmd, "group", ""),
 			Env:         flagString(cmd, "env", ""),
 			NamespaceId: flagString(cmd, "namespace-id", ""),
+			Username:    flagString(cmd, "username", ""),
+			Password:    flagString(cmd, "password", ""),
+		}
+		// TLS 材料(仅 Etcd):从文件读取 PEM。
+		if p := flagString(cmd, "ca-cert", ""); p != "" {
+			data, err := os.ReadFile(p)
+			if err != nil {
+				fail(fmt.Errorf("读取 ca-cert 失败: %w", err))
+			}
+			rc.CaCertPem = string(data)
+		}
+		if p := flagString(cmd, "client-cert", ""); p != "" {
+			data, err := os.ReadFile(p)
+			if err != nil {
+				fail(fmt.Errorf("读取 client-cert 失败: %w", err))
+			}
+			rc.ClientCertPem = string(data)
+		}
+		if p := flagString(cmd, "client-key", ""); p != "" {
+			data, err := os.ReadFile(p)
+			if err != nil {
+				fail(fmt.Errorf("读取 client-key 失败: %w", err))
+			}
+			rc.ClientKeyPem = string(data)
 		}
 		if msg := rc.Validate(); msg != "" {
 			checkErr(fmt.Errorf("%s", msg))
@@ -78,14 +103,14 @@ Etcd endpoint 支持 host:port 或 http(s)://host:port，逗号分隔多节点�
 		}
 
 		if serviceName != "" {
-			if err := ce.ExportOne(string(rc.Type), rc.Endpoint, rc.ProjectName, projectRoot, rc.Group, rc.Env, rc.NamespaceId, serviceName); err != nil {
+			if err := ce.ExportOne(&rc, projectRoot, serviceName); err != nil {
 				fail(err)
 			}
 			emit(map[string]any{"success": true, "service": serviceName})
 			return
 		}
 
-		if err := ce.ExportAll(string(rc.Type), rc.Endpoint, rc.ProjectName, projectRoot, rc.Group, rc.Env, rc.NamespaceId); err != nil {
+		if err := ce.ExportAll(&rc, projectRoot); err != nil {
 			fail(err)
 		}
 		emit(map[string]any{"success": true, "all": true})
@@ -101,6 +126,11 @@ func init() {
 	configExportCmd.Flags().String("group", "", "Nacos 分组")
 	configExportCmd.Flags().String("env", "", "Nacos 环境")
 	configExportCmd.Flags().String("namespace-id", "", "Nacos 命名空间")
+	configExportCmd.Flags().String("username", "", "Etcd/Nacos 用户名(服务端开启认证时使用)")
+	configExportCmd.Flags().String("password", "", "Etcd/Nacos 密码(服务端开启认证时使用)")
+	configExportCmd.Flags().String("ca-cert", "", "Etcd TLS:CA 证书 PEM 文件路径")
+	configExportCmd.Flags().String("client-cert", "", "Etcd TLS:客户端证书 PEM 文件路径")
+	configExportCmd.Flags().String("client-key", "", "Etcd TLS:客户端私钥 PEM 文件路径")
 	configExportCmd.Flags().String("service", "", "只导出指定服务（缺省全部）")
 	configExportCmd.Flags().String("path", ".", "项目根目录")
 	configExportCmd.Flags().Bool("dry-run", false, "只列出将导出的服务，不实际写入")

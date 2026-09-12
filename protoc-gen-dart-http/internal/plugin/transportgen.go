@@ -5,8 +5,6 @@ import (
 
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
-	"google.golang.org/genproto/googleapis/api/annotations"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -161,10 +159,10 @@ func generateServerStreamMethod(
 	rule httprule.Rule,
 ) {
 	output := typeFromMessage(pkg, method.Output())
-	dartMethodName := lowerCamel(string(method.Name()))
+	dartMethodName := codegen.LowerFirst(string(method.Name()))
 
 	paramName := "request"
-	if !methodUsesRequest(rule, method.Input()) {
+	if !httprule.MethodUsesRequest(rule, method.Input(), IsWellKnownType) {
 		paramName = "_request"
 	}
 
@@ -199,7 +197,7 @@ func generateBidiStreamMethod(
 	method protoreflect.MethodDescriptor,
 	rule httprule.Rule,
 ) {
-	if hasPathVariables(rule) {
+	if rule.Template.HasVariables() {
 		generateBidiStreamWithParams(f, pkg, method, rule)
 	} else {
 		generateBidiStreamLiteral(f, pkg, method, rule)
@@ -214,8 +212,8 @@ func generateBidiStreamLiteral(
 ) {
 	inputType := typeFromMessage(pkg, method.Input())
 	outputType := typeFromMessage(pkg, method.Output())
-	dartMethodName := lowerCamel(string(method.Name()))
-	path := literalPath(rule)
+	dartMethodName := codegen.LowerFirst(string(method.Name()))
+	path := rule.Template.LiteralPath(dartString)
 
 	commentGenerator{descriptor: method}.generateLeading(f, 1)
 	f.P(t(1), "TypedDuplexConnection<", inputType.Reference(), ", ", outputType.Reference(), "> ", dartMethodName, "({Map<String, String>? headers}) {")
@@ -247,7 +245,7 @@ func generateBidiStreamWithParams(
 ) {
 	inputType := typeFromMessage(pkg, method.Input())
 	outputType := typeFromMessage(pkg, method.Output())
-	dartMethodName := lowerCamel(string(method.Name()))
+	dartMethodName := codegen.LowerFirst(string(method.Name()))
 
 	commentGenerator{descriptor: method}.generateLeading(f, 1)
 	f.P(t(1), "TypedDuplexConnection<", inputType.Reference(), ", ", outputType.Reference(), "> ", dartMethodName, "(", inputType.Reference(), " request, {Map<String, String>? headers}) {")
@@ -270,48 +268,4 @@ func generateBidiStreamWithParams(
 	}
 	f.P(t(2), ");")
 	f.P(t(1), "}")
-}
-
-func literalPath(rule httprule.Rule) string {
-	parts := make([]string, 0, len(rule.Template.Segments))
-	for _, seg := range rule.Template.Segments {
-		switch seg.Kind {
-		case httprule.SegmentKindLiteral:
-			parts = append(parts, seg.Literal)
-		case httprule.SegmentKindMatchSingle:
-			parts = append(parts, "*")
-		case httprule.SegmentKindMatchMultiple:
-			parts = append(parts, "**")
-		}
-	}
-	path := "/" + strings.Join(parts, "/")
-	if rule.Template.Verb != "" {
-		path += ":" + rule.Template.Verb
-	}
-	return dartString(path)
-}
-
-func hasPathVariables(rule httprule.Rule) bool {
-	for _, seg := range rule.Template.Segments {
-		if seg.Kind == httprule.SegmentKindVariable {
-			return true
-		}
-	}
-	return false
-}
-
-func isStreamingMethod(method protoreflect.MethodDescriptor) bool {
-	return method.IsStreamingClient() || method.IsStreamingServer()
-}
-
-// getDefaultHost reads the google.api.default_host extension from a service descriptor.
-func getDefaultHost(service protoreflect.ServiceDescriptor) string {
-	if service.Options() == nil {
-		return ""
-	}
-	ext := proto.GetExtension(service.Options(), annotations.E_DefaultHost)
-	if host, ok := ext.(string); ok && host != "" {
-		return host
-	}
-	return ""
 }

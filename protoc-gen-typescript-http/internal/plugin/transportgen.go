@@ -1,12 +1,8 @@
 package plugin
 
 import (
-	"strings"
-
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
-	"google.golang.org/genproto/googleapis/api/annotations"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -48,7 +44,7 @@ func generateStreamInterfaceMethod(f *codegen.File, pkg protoreflect.FullName, m
 	input := typeFromMessage(pkg, method.Input())
 	output := typeFromMessage(pkg, method.Output())
 	if method.IsStreamingClient() {
-		if hasPathVariables(rule) {
+		if rule.Template.HasVariables() {
 			f.P(t(1), method.Name(), "(")
 			f.P(t(2), "request: ", input.Reference(), ",")
 			f.P(t(1), "): DuplexStream<", input.Reference(), ", ", output.Reference(), ">;")
@@ -83,7 +79,7 @@ func generateServerStreamMethod(
 ) {
 	output := typeFromMessage(pkg, method.Output())
 	paramName := "request"
-	if !methodUsesRequest(rule, method.Input()) {
+	if !httprule.MethodUsesRequest(rule, method.Input(), IsWellKnownType) {
 		paramName = "_request"
 	}
 	f.P(t(2), method.Name(), "(", paramName, ") {")
@@ -110,7 +106,7 @@ func generateBidiStreamMethod(
 	method protoreflect.MethodDescriptor,
 	rule httprule.Rule,
 ) {
-	if hasPathVariables(rule) {
+	if rule.Template.HasVariables() {
 		generateBidiStreamWithParams(f, method, rule)
 	} else {
 		generateBidiStreamLiteral(f, method, rule)
@@ -122,7 +118,7 @@ func generateBidiStreamLiteral(
 	method protoreflect.MethodDescriptor,
 	rule httprule.Rule,
 ) {
-	path := literalPath(rule)
+	path := rule.Template.LiteralPath(tsSingleQuote)
 	f.P(t(2), method.Name(), "() {")
 	f.P(t(3), "const path = ", path, ";")
 	f.P(t(3), "return transport.duplexStream(path, {")
@@ -145,48 +141,4 @@ func generateBidiStreamWithParams(
 	f.P(t(4), "method: '", method.Name(), "',")
 	f.P(t(3), "});")
 	f.P(t(2), "},")
-}
-
-func literalPath(rule httprule.Rule) string {
-	parts := make([]string, 0, len(rule.Template.Segments))
-	for _, seg := range rule.Template.Segments {
-		switch seg.Kind {
-		case httprule.SegmentKindLiteral:
-			parts = append(parts, seg.Literal)
-		case httprule.SegmentKindMatchSingle:
-			parts = append(parts, "*")
-		case httprule.SegmentKindMatchMultiple:
-			parts = append(parts, "**")
-		}
-	}
-	path := "/" + strings.Join(parts, "/")
-	if rule.Template.Verb != "" {
-		path += ":" + rule.Template.Verb
-	}
-	return tsSingleQuote(path)
-}
-
-func hasPathVariables(rule httprule.Rule) bool {
-	for _, seg := range rule.Template.Segments {
-		if seg.Kind == httprule.SegmentKindVariable {
-			return true
-		}
-	}
-	return false
-}
-
-func isStreamingMethod(method protoreflect.MethodDescriptor) bool {
-	return method.IsStreamingClient() || method.IsStreamingServer()
-}
-
-// getDefaultHost reads the google.api.default_host extension from a service descriptor.
-func getDefaultHost(service protoreflect.ServiceDescriptor) string {
-	if service.Options() == nil {
-		return ""
-	}
-	ext := proto.GetExtension(service.Options(), annotations.E_DefaultHost)
-	if host, ok := ext.(string); ok && host != "" {
-		return host
-	}
-	return ""
 }

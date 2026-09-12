@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/protowalk"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -21,7 +22,7 @@ import (
 // wireField 返回按字段号升序的字段列表（wire 编解码的发射顺序）。
 func wireFields(message protoreflect.MessageDescriptor) []protoreflect.FieldDescriptor {
 	fields := make([]protoreflect.FieldDescriptor, 0, message.Fields().Len())
-	rangeFields(message, func(field protoreflect.FieldDescriptor) {
+	protowalk.RangeFields(message, func(field protoreflect.FieldDescriptor) {
 		fields = append(fields, field)
 	})
 	sort.Slice(fields, func(i, j int) bool {
@@ -225,7 +226,7 @@ func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	n := int(field.Number())
 	keyMethod := wireScalarWriter(field.MapKey().Kind())
 	if keyMethod == "" {
-		return wireGuard(n, fname, "throw UnsupportedError('dart-http wire: map key " + string(field.FullName()) + "');")
+		return wireGuard(n, fname, "throw UnsupportedError('dart-http wire: map key "+string(field.FullName())+"');")
 	}
 
 	var setValue string
@@ -242,7 +243,7 @@ func wireMapWriteStmts(pkg protoreflect.FullName, field protoreflect.FieldDescri
 	default:
 		vm := wireScalarWriter(field.MapValue().Kind())
 		if vm == "" {
-			return wireGuard(n, fname, "throw UnsupportedError('dart-http wire: map value " + string(field.FullName()) + "');")
+			return wireGuard(n, fname, "throw UnsupportedError('dart-http wire: map value "+string(field.FullName())+"');")
 		}
 		setValue = "ew." + vm + "(2, v);"
 	}

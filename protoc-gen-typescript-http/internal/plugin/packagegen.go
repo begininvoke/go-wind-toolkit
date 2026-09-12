@@ -2,6 +2,7 @@ package plugin
 
 import (
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/protowalk"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -13,7 +14,7 @@ type packageGenerator struct {
 
 func (p packageGenerator) Generate(f *codegen.File) error {
 	p.generateHeader(f)
-	defaultHost := p.readDefaultHost()
+	defaultHost := httprule.FirstDefaultHost(p.files, Warn)
 	generateTransportInfra(f, defaultHost)
 	var walkErr error
 	var services []protoreflect.ServiceDescriptor
@@ -48,28 +49,6 @@ func (p packageGenerator) Generate(f *codegen.File) error {
 	// Generate the unified ApiClient after all individual service clients.
 	generateApiClient(f, services)
 	return nil
-}
-
-func (p packageGenerator) readDefaultHost() string {
-	var firstHost string
-	var firstService string
-	for _, file := range p.files {
-		services := file.Services()
-		for i := 0; i < services.Len(); i++ {
-			svc := services.Get(i)
-			host := getDefaultHost(svc)
-			if host == "" {
-				continue
-			}
-			if firstHost == "" {
-				firstHost = host
-				firstService = string(svc.FullName())
-			} else if host != firstHost {
-				Warn("service %s has default_host %q but service %s already set %q; using the first one", svc.FullName(), host, firstService, firstHost)
-			}
-		}
-	}
-	return firstHost
 }
 
 func (p packageGenerator) generateHeader(f *codegen.File) {

@@ -3,6 +3,7 @@ package plugin
 import (
 	"strings"
 
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -165,7 +166,7 @@ func (wkt WellKnown) DartType() string {
 
 // TypeDeclaration returns a Dart comment documenting the well-known type mapping.
 func (wkt WellKnown) TypeDeclaration() string {
-	var w writer
+	w := new(codegen.File)
 	shortName := shortName(string(wkt))
 	switch wkt {
 	case WellKnownAny:
@@ -227,7 +228,7 @@ func (wkt WellKnown) TypeDeclaration() string {
 		w.P("///")
 		w.P("/// Maps to Dart: `", wkt.DartType(), "`.")
 	}
-	return w.String()
+	return string(w.Content())
 }
 
 // shortName extracts the short type name from the full proto name.
@@ -240,20 +241,4 @@ func shortName(fullName string) string {
 		return parts[len(parts)-1]
 	}
 	return fullName
-}
-
-type writer struct {
-	b strings.Builder
-}
-
-func (w *writer) P(ss ...string) {
-	for _, s := range ss {
-		// strings.Builder never returns an error, so safe to ignore
-		_, _ = w.b.WriteString(s)
-	}
-	_, _ = w.b.WriteString("\n")
-}
-
-func (w *writer) String() string {
-	return w.b.String()
 }

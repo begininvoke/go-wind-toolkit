@@ -7,6 +7,7 @@ import (
 
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/httprule"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/protowalk"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -23,13 +24,13 @@ func (s serviceGenerator) Generate(f *codegen.File) error {
 func (s serviceGenerator) generateInterface(f *codegen.File) {
 	commentGenerator{descriptor: s.service}.generateLeading(f, 0)
 	f.P("export interface ", descriptorTypeName(s.service), " {")
-	rangeMethods(s.service.Methods(), func(method protoreflect.MethodDescriptor) {
-		ok, reason := supportedMethod(method)
+	protowalk.RangeMethods(s.service.Methods(), func(method protoreflect.MethodDescriptor) {
+		ok, reason := httprule.SupportedMethod(method)
 		if !ok {
 			Warn("method %s.%s skipped: %s", s.service.FullName(), method.Name(), reason)
 			return
 		}
-		if isStreamingMethod(method) {
+		if protowalk.IsStreamingMethod(method) {
 			r, ok := httprule.Get(method)
 			if !ok {
 				Warn("streaming method %s.%s has no http rule; skipping", s.service.FullName(), method.Name())
@@ -75,7 +76,7 @@ func (s serviceGenerator) generateAltInterfaceMethods(
 		return
 	}
 	for i, additional := range rule.AdditionalRules {
-		f.P(t(1), "/** Alternate HTTP binding #", i+1, " of ", method.Name(), ": ", additional.Method, " ", templatePathString(additional), " */")
+		f.P(t(1), "/** Alternate HTTP binding #", i+1, " of ", method.Name(), ": ", additional.Method, " ", additional.Template.String(), " */")
 		f.P(t(1), method.Name(), "Alt", i+1, "(")
 		f.P(t(2), "request: ", input.Reference(), ",")
 		f.P(t(1), "): Promise<", output.Reference(), ">;")
@@ -97,8 +98,8 @@ func (s serviceGenerator) generateClient(f *codegen.File) error {
 	)
 	f.P(t(1), "return {")
 	var methodErrs []error
-	rangeMethods(s.service.Methods(), func(method protoreflect.MethodDescriptor) {
-		ok, reason := supportedMethod(method)
+	protowalk.RangeMethods(s.service.Methods(), func(method protoreflect.MethodDescriptor) {
+		ok, reason := httprule.SupportedMethod(method)
 		if !ok {
 			Warn("method %s.%s skipped in client: %s", s.service.FullName(), method.Name(), reason)
 			return
@@ -126,10 +127,10 @@ func (s serviceGenerator) generateMethod(f *codegen.File, method protoreflect.Me
 	if err != nil {
 		return fmt.Errorf("parse http rule: %w", err)
 	}
-	if isStreamingMethod(method) {
+	if protowalk.IsStreamingMethod(method) {
 		generateStreamClientMethod(f, s.pkg, method, rule)
 		for i := range rule.AdditionalRules {
-			Warn("method %s.%s: streaming additional binding %d skipped (streaming methods support the primary binding only)", s.service.FullName(), method.Name(), i+1)
+			Warn("method %s.%s: streaming additional binding %d skipped (streaming methods support the primary binding only)", s.service.FullName(), method.Name(), i)
 		}
 		return nil
 	}
@@ -159,10 +160,10 @@ func (s serviceGenerator) generateUnaryMethod(
 	bindingIndex int,
 ) error {
 	if bindingIndex > 0 {
-		f.P(t(2), "// Alternate HTTP binding #", bindingIndex, " of ", method.Name(), ": ", rule.Method, " ", templatePathString(rule))
+		f.P(t(2), "// Alternate HTTP binding #", bindingIndex, " of ", method.Name(), ": ", rule.Method, " ", rule.Template.String())
 	}
 	paramName := "request"
-	if !methodUsesRequest(rule, method.Input()) {
+	if !httprule.MethodUsesRequest(rule, method.Input(), IsWellKnownType) {
 		paramName = "_request"
 	}
 	f.P(t(2), tsMethodName, "(", paramName, ") {")
@@ -184,29 +185,6 @@ func (s serviceGenerator) generateUnaryMethod(
 	f.P(t(3), "}) as Promise<", outputType.Reference(), ">;")
 	f.P(t(2), "},")
 	return nil
-}
-
-// templatePathString renders a binding's URL template for comments, with
-// {field.path} placeholders for path variables.
-func templatePathString(rule httprule.Rule) string {
-	parts := make([]string, 0, len(rule.Template.Segments))
-	for _, seg := range rule.Template.Segments {
-		switch seg.Kind {
-		case httprule.SegmentKindVariable:
-			parts = append(parts, "{"+seg.Variable.FieldPath.String()+"}")
-		case httprule.SegmentKindLiteral:
-			parts = append(parts, seg.Literal)
-		case httprule.SegmentKindMatchSingle:
-			parts = append(parts, "*")
-		case httprule.SegmentKindMatchMultiple:
-			parts = append(parts, "**")
-		}
-	}
-	path := "/" + strings.Join(parts, "/")
-	if rule.Template.Verb != "" {
-		path += ":" + rule.Template.Verb
-	}
-	return path
 }
 
 func generateMethodPathValidation(
@@ -273,7 +251,7 @@ func generateMethodBody(
 	case rule.Body == "":
 		f.P(t(3), "const body = null;")
 	case rule.Body == "*":
-		if pathVars := pathVariableJSONNames(rule); len(pathVars) > 0 {
+		if pathVars := rule.Template.PathVariableFieldPaths(); len(pathVars) > 0 {
 			// Path-bound fields must not be duplicated in the body: the server
 			// binds them from the URL path, and a field arriving from both
 			// sources conflicts on its (synthetic) oneof.
@@ -297,27 +275,6 @@ func generateMethodBody(
 	}
 }
 
-// pathVariableJSONNames returns the JSON name path of every field bound by
-// the path template, for exclusion from the request body. The input message
-// descriptor is only needed to resolve names; unknown fields fall back to
-// their proto names (the emitted removal then degrades to a no-op).
-func pathVariableJSONNames(rule httprule.Rule) [][]string {
-	var paths [][]string
-	seen := make(map[string]struct{})
-	for _, seg := range rule.Template.Segments {
-		if seg.Kind != httprule.SegmentKindVariable {
-			continue
-		}
-		key := seg.Variable.FieldPath.String()
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		paths = append(paths, seg.Variable.FieldPath)
-	}
-	return paths
-}
-
 // tsBodyStripStmts emits TS statements removing a (possibly nested) key from
 // the shallow-copied body map. Intermediate levels are re-copied first so the
 // delete never mutates the caller's request object.
@@ -330,62 +287,20 @@ func tsBodyStripStmts(f *codegen.File, namePath []string) {
 	f.P(t(3), `delete bodyMap["`+full+`"];`)
 }
 
-// methodUsesRequest returns true if the generated method body will reference
-// the request parameter (in path, body, or query params).
-func methodUsesRequest(rule httprule.Rule, input protoreflect.MessageDescriptor) bool {
-	return hasPathVariables(rule) || rule.Body != "" || hasQueryParams(input, rule)
-}
-
-// hasQueryParams returns true if the method has fields that will be rendered
-// as query parameters.
-func hasQueryParams(input protoreflect.MessageDescriptor, rule httprule.Rule) bool {
-	if rule.Body == "*" {
-		return false
-	}
-	pathCovered := make(map[string]struct{})
-	for _, segment := range rule.Template.Segments {
-		if segment.Kind != httprule.SegmentKindVariable {
-			continue
-		}
-		pathCovered[segment.Variable.FieldPath.String()] = struct{}{}
-	}
-	found := false
-	walkJSONLeafFields(input, func(path httprule.FieldPath, field protoreflect.FieldDescriptor) {
-		if found {
-			return
-		}
-		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
-			return
-		}
-		if isMessageCollectionField(field) {
-			return
-		}
-		found = true
-	})
-	return found
-}
-
 func generateMethodQuery(
 	f *codegen.File,
 	input protoreflect.MessageDescriptor,
 	rule httprule.Rule,
 ) bool {
-	if !hasQueryParams(input, rule) {
+	if !httprule.HasQueryParams(input, rule, IsWellKnownType) {
 		return false
 	}
-	pathCovered := make(map[string]struct{})
-	for _, segment := range rule.Template.Segments {
-		if segment.Kind != httprule.SegmentKindVariable {
-			continue
-		}
-		pathCovered[segment.Variable.FieldPath.String()] = struct{}{}
-	}
 	f.P(t(3), "const queryParams: string[] = [];")
-	walkJSONLeafFields(input, func(path httprule.FieldPath, field protoreflect.FieldDescriptor) {
-		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
+	httprule.WalkJSONLeafFields(input, IsWellKnownType, func(path httprule.FieldPath, field protoreflect.FieldDescriptor) {
+		if rule.QueryExcluded(path) {
 			return
 		}
-		if isMessageCollectionField(field) {
+		if protowalk.IsMessageCollectionField(field) {
 			return
 		}
 		nullPath := nullPropagationPath(path, input)
@@ -412,41 +327,6 @@ func generateMethodQuery(
 		f.P(t(3), "}")
 	})
 	return true
-}
-
-func isPathCovered(path httprule.FieldPath, covered map[string]struct{}) bool {
-	_, ok := covered[path.String()]
-	return ok
-}
-
-func isBodyField(path httprule.FieldPath, rule httprule.Rule) bool {
-	return rule.Body != "" && path[0] == rule.Body
-}
-
-// isMessageCollectionField returns true if the field is a repeated or map field
-// whose element/value type is a message. Such fields cannot be meaningfully
-// serialized as query parameters.
-func isMessageCollectionField(field protoreflect.FieldDescriptor) bool {
-	if field.IsList() && field.Kind() == protoreflect.MessageKind {
-		return true
-	}
-	if field.IsMap() && field.MapValue().Kind() == protoreflect.MessageKind {
-		return true
-	}
-	return false
-}
-
-// supportedMethod returns whether a method is supported by this generator,
-// along with a human-readable reason if it is not.
-func supportedMethod(method protoreflect.MethodDescriptor) (bool, string) {
-	_, ok := httprule.Get(method)
-	if !ok {
-		return false, "no http rule annotation (google.api.http)"
-	}
-	if method.IsStreamingClient() && !method.IsStreamingServer() {
-		return false, "client-only streaming is not supported"
-	}
-	return true, ""
 }
 
 func jsonPath(path httprule.FieldPath, message protoreflect.MessageDescriptor) string {

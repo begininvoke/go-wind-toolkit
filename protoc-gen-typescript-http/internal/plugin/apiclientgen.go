@@ -49,7 +49,7 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	}
 	for _, svc := range services {
 		typeName := descriptorTypeName(svc)
-		fieldName := lowerFirst(string(svc.Name()))
+		fieldName := codegen.LowerFirst(string(svc.Name()))
 		fields = append(fields, classField{
 			declaration: t(1) + "private _" + fieldName + "?: " + typeName + ";",
 			name:        "_" + fieldName,
@@ -73,12 +73,12 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	sortedServices := make([]protoreflect.ServiceDescriptor, len(services))
 	copy(sortedServices, services)
 	sort.Slice(sortedServices, func(i, j int) bool {
-		return lowerFirst(string(sortedServices[i].Name())) < lowerFirst(string(sortedServices[j].Name()))
+		return codegen.LowerFirst(string(sortedServices[i].Name())) < codegen.LowerFirst(string(sortedServices[j].Name()))
 	})
 	for i, svc := range sortedServices {
 		typeName := descriptorTypeName(svc)
 		serviceName := string(svc.Name())
-		fieldName := lowerFirst(serviceName)
+		fieldName := codegen.LowerFirst(serviceName)
 		f.P(t(1), "get ", fieldName, "(): ", typeName, " {")
 		f.P(t(2), "return this._", fieldName, " ??= create", serviceName, "Client(this._transport);")
 		f.P(t(1), "}")
@@ -94,16 +94,4 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	f.P(t(1), "return new ApiClient(transport);")
 	f.P("}")
 	f.P()
-}
-
-// lowerFirst returns s with its first character lowercased.
-func lowerFirst(s string) string {
-	if len(s) == 0 {
-		return s
-	}
-	bytes := []byte(s)
-	if bytes[0] >= 'A' && bytes[0] <= 'Z' {
-		bytes[0] += 32
-	}
-	return string(bytes)
 }

@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/protowalk"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -16,7 +17,7 @@ func (m messageGenerator) Generate(f *codegen.File) {
 	commentGenerator{descriptor: m.message}.generateLeading(f, 0)
 	f.P("export type ", scopedDescriptorTypeName(m.pkg, m.message), " = {")
 	fields := make([]protoreflect.FieldDescriptor, 0, m.message.Fields().Len())
-	rangeFields(m.message, func(field protoreflect.FieldDescriptor) {
+	protowalk.RangeFields(m.message, func(field protoreflect.FieldDescriptor) {
 		fields = append(fields, field)
 	})
 	sort.Slice(fields, func(i, j int) bool {
@@ -27,7 +28,7 @@ func (m messageGenerator) Generate(f *codegen.File) {
 		fieldType := typeFromField(m.pkg, field)
 		if field.ContainingOneof() == nil && !field.HasOptionalKeyword() {
 			ref := fieldType.Reference()
-			if localeCompare(ref, "undefined") {
+			if codegen.LocaleCompare(ref, "undefined") {
 				f.P(t(1), field.JSONName(), ": ", ref, " | undefined;")
 			} else {
 				f.P(t(1), field.JSONName(), ": undefined | ", ref, ";")

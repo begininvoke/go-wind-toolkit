@@ -3,6 +3,7 @@ package plugin
 import (
 	"strings"
 
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -47,30 +48,9 @@ func packagePrefix(pkg protoreflect.FullName) string {
 	return strings.Join(parts, "")
 }
 
-func rangeFields(message protoreflect.MessageDescriptor, f func(field protoreflect.FieldDescriptor)) {
-	for i := 0; i < message.Fields().Len(); i++ {
-		f(message.Fields().Get(i))
-	}
-}
-
-func rangeMethods(methods protoreflect.MethodDescriptors, f func(method protoreflect.MethodDescriptor)) {
-	for i := 0; i < methods.Len(); i++ {
-		f(methods.Get(i))
-	}
-}
-
-func rangeEnumValues(enum protoreflect.EnumDescriptor, f func(value protoreflect.EnumValueDescriptor, last bool)) {
-	for i := 0; i < enum.Values().Len(); i++ {
-		if i == enum.Values().Len()-1 {
-			f(enum.Values().Get(i), true)
-		} else {
-			f(enum.Values().Get(i), false)
-		}
-	}
-}
-
+// t returns n levels of indentation for generated code.
 func t(n int) string {
-	return strings.Repeat("  ", n)
+	return codegen.Indent(n)
 }
 
 // dartEscapeLiteral escapes a path literal for embedding inside a Dart string
@@ -88,18 +68,6 @@ func dartEscapeLiteral(s string) string {
 // quotes, and dollars as needed.
 func dartString(s string) string {
 	return "'" + dartEscapeLiteral(s) + "'"
-}
-
-// lowerCamel converts a PascalCase or UPPER_SNAKE_CASE name to lowerCamelCase.
-func lowerCamel(s string) string {
-	if s == "" {
-		return s
-	}
-	r := []rune(s)
-	if r[0] >= 'A' && r[0] <= 'Z' {
-		r[0] += 32
-	}
-	return string(r)
 }
 
 // protoEnumToDartName converts an UPPER_SNAKE_CASE proto enum value name to
@@ -122,50 +90,6 @@ func protoEnumToDartName(s string) string {
 		}
 	}
 	return sb.String()
-}
-
-// localeCompare compares two strings in a way that matches JavaScript's
-// String.prototype.localeCompare for the common cases encountered in generated
-// code.
-func localeCompare(a, b string) bool {
-	return sortKey(a) < sortKey(b)
-}
-
-// sortKey transforms a string into a comparison key where:
-//   - Non-alphanumeric characters (punctuation, symbols) sort before alphanumerics
-//   - Digits sort after punctuation but before letters
-//   - Letters are compared case-insensitively (lowercase form used)
-func sortKey(s string) string {
-	var sb strings.Builder
-	for _, c := range []byte(s) {
-		switch {
-		case c >= 'a' && c <= 'z':
-			sb.WriteByte(2)
-			sb.WriteByte(c)
-		case c >= 'A' && c <= 'Z':
-			sb.WriteByte(2)
-			sb.WriteByte(c + 32)
-		case c >= '0' && c <= '9':
-			sb.WriteByte(1)
-			sb.WriteByte(c)
-		default:
-			sb.WriteByte(0)
-			sb.WriteByte(c)
-		}
-	}
-	return sb.String()
-}
-
-// lowerFirst returns s with its first character lowercased.
-func lowerFirst(s string) string {
-	if len(s) == 0 {
-		return s
-	}
-	bytes := []byte(s)
-	if bytes[0] >= 'A' && bytes[0] <= 'Z' {
-		bytes[0] += 32
-	}
-	return string(bytes)
 }
 
 // dartReservedWords is the set of Dart reserved words, built-in identifiers,

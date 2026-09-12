@@ -3,6 +3,7 @@ package plugin
 import (
 	"strings"
 
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -59,7 +60,7 @@ func (wkt WellKnown) Name() string {
 }
 
 func (wkt WellKnown) TypeDeclaration() string {
-	var w writer
+	w := new(codegen.File)
 	switch wkt {
 	case WellKnownAny:
 		w.P("// If the Any contains a value that has a special JSON mapping,")
@@ -137,21 +138,5 @@ func (wkt WellKnown) TypeDeclaration() string {
 		w.P("// No mapping for this well known type is generated, yet.")
 		w.P("type ", wkt.Name(), " = unknown;")
 	}
-	return w.String()
-}
-
-type writer struct {
-	b strings.Builder
-}
-
-func (w *writer) P(ss ...string) {
-	for _, s := range ss {
-		// strings.Builder never returns an error, so safe to ignore
-		_, _ = w.b.WriteString(s)
-	}
-	_, _ = w.b.WriteString("\n")
-}
-
-func (w *writer) String() string {
-	return w.b.String()
+	return string(w.Content())
 }

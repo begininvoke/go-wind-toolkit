@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/codegen"
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-common/protowalk"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -18,11 +19,11 @@ func (m messageGenerator) Generate(f *codegen.File) {
 	className := scopedDescriptorTypeName(m.pkg, m.message)
 
 	fields := make([]protoreflect.FieldDescriptor, 0, m.message.Fields().Len())
-	rangeFields(m.message, func(field protoreflect.FieldDescriptor) {
+	protowalk.RangeFields(m.message, func(field protoreflect.FieldDescriptor) {
 		fields = append(fields, field)
 	})
 	sort.Slice(fields, func(i, j int) bool {
-		return localeCompare(fields[i].JSONName(), fields[j].JSONName())
+		return codegen.LocaleCompare(fields[i].JSONName(), fields[j].JSONName())
 	})
 
 	// class declaration

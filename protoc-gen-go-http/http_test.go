@@ -1,7 +1,6 @@
 package main
 
 import (
-	"reflect"
 	"strings"
 	"testing"
 
@@ -51,27 +50,6 @@ func TestRenderRoutePathRejectsMalformedTemplates(t *testing.T) {
 		if _, err := httprule.ParseTemplate(template); err == nil {
 			t.Errorf("ParseTemplate(%q) should reject the malformed template", template)
 		}
-	}
-}
-
-// TestTemplateVarFieldPaths 变量字段路径按段序确定性返回。
-func TestTemplateVarFieldPaths(t *testing.T) {
-	tmpl, err := httprule.ParseTemplate("/test/{message.id}/{message.name=messages/*}")
-	if err != nil {
-		t.Fatalf("ParseTemplate: %v", err)
-	}
-	got := templateVarFieldPaths(tmpl)
-	want := [][]string{{"message", "id"}, {"message", "name"}}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("templateVarFieldPaths = %v, want %v", got, want)
-	}
-
-	tmpl, err = httprule.ParseTemplate("/test/noparams")
-	if err != nil {
-		t.Fatalf("ParseTemplate: %v", err)
-	}
-	if got := templateVarFieldPaths(tmpl); got != nil {
-		t.Fatalf("templateVarFieldPaths on varless template = %v, want nil", got)
 	}
 }
 
@@ -241,16 +219,16 @@ func TestHTTPTemplateResponseBody(t *testing.T) {
 }
 
 func TestAllFieldsPathBound(t *testing.T) {
-	if !allFieldsPathBound([]string{"source", "key"}, [][]string{{"source"}, {"key"}}) {
+	if !allFieldsPathBound([]string{"source", "key"}, []httprule.FieldPath{{"source"}, {"key"}}) {
 		t.Fatal("fields fully consumed by path variables must be reported as bound")
 	}
 	if !allFieldsPathBound(nil, nil) {
 		t.Fatal("a request with no fields is vacuously bound")
 	}
-	if allFieldsPathBound([]string{"source", "filter"}, [][]string{{"source"}, {"key"}}) {
+	if allFieldsPathBound([]string{"source", "filter"}, []httprule.FieldPath{{"source"}, {"key"}}) {
 		t.Fatal("a field no path variable binds must not be reported as bound")
 	}
-	if allFieldsPathBound([]string{"foo"}, [][]string{{"foo", "bar"}}) {
+	if allFieldsPathBound([]string{"foo"}, []httprule.FieldPath{{"foo", "bar"}}) {
 		t.Fatal("a dotted path variable must not count as binding a top-level field")
 	}
 }

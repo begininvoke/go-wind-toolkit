@@ -140,7 +140,7 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 	}
 	body := parsed.Body
 	responseBody := rule.ResponseBody
-	varFieldPaths := templateVarFieldPaths(parsed.Template)
+	varFieldPaths := parsed.Template.PathVariableFieldPaths()
 	routePath := renderRoutePath(parsed.Template)
 	md := buildMethodDesc(g, m, method, routePath, varFieldPaths)
 	// Client-streaming RPCs are served over WebSocket, whose handshake is always an
@@ -214,7 +214,7 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 	return md
 }
 
-func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path string, varFieldPaths [][]string) *methodDesc {
+func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path string, varFieldPaths []httprule.FieldPath) *methodDesc {
 	defer func() { methodSets[m.GoName]++ }()
 
 	var pathVarNames []string
@@ -297,18 +297,6 @@ func isHTTPBodyField(fd protoreflect.FieldDescriptor) bool {
 
 func isHTTPBodyMessage(md protoreflect.MessageDescriptor) bool {
 	return md != nil && md.FullName() == httpBodyFullName
-}
-
-// templateVarFieldPaths 收集模板中全部顶层变量段的字段路径,按段序
-// 确定性返回(旧实现经 map 收集,遍历顺序随机)。
-func templateVarFieldPaths(tmpl httprule.Template) [][]string {
-	var out [][]string
-	for _, seg := range tmpl.Segments {
-		if seg.Kind == httprule.SegmentKindVariable {
-			out = append(out, seg.Variable.FieldPath)
-		}
-	}
-	return out
 }
 
 // renderRoutePath 从解析后的模板段确定性重建 kratos 路由注册形态。
@@ -399,7 +387,7 @@ func inputFieldNames(m *protogen.Method) []string {
 // than a degradation bug. Dotted path variables (e.g. "{foo.bar}")
 // deliberately bind no top-level field name, so nested bindings stay on the
 // warning side of the check.
-func allFieldsPathBound(fieldNames []string, varFieldPaths [][]string) bool {
+func allFieldsPathBound(fieldNames []string, varFieldPaths []httprule.FieldPath) bool {
 	for _, name := range fieldNames {
 		bound := false
 		for _, fp := range varFieldPaths {

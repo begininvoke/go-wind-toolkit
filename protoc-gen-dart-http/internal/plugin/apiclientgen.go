@@ -34,7 +34,7 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	sortedServices := make([]protoreflect.ServiceDescriptor, len(services))
 	copy(sortedServices, services)
 	sort.Slice(sortedServices, func(i, j int) bool {
-		return lowerFirst(string(sortedServices[i].Name())) < lowerFirst(string(sortedServices[j].Name()))
+		return codegen.LowerFirst(string(sortedServices[i].Name())) < codegen.LowerFirst(string(sortedServices[j].Name()))
 	})
 
 	// Class declaration
@@ -44,7 +44,7 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 
 	// Private lazy fields
 	for _, svc := range sortedServices {
-		fieldName := lowerFirst(string(svc.Name()))
+		fieldName := codegen.LowerFirst(string(svc.Name()))
 		clientName := descriptorTypeName(svc) + "Client"
 		f.P(t(1), clientName, "? _", fieldName, ";")
 	}
@@ -56,7 +56,7 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 
 	// Getter for each service
 	for i, svc := range sortedServices {
-		fieldName := lowerFirst(string(svc.Name()))
+		fieldName := codegen.LowerFirst(string(svc.Name()))
 		clientName := descriptorTypeName(svc) + "Client"
 		f.P(t(1), clientName, " get ", fieldName, " {")
 		f.P(t(2), "_", fieldName, " ??= ", clientName, "(_transport);")
@@ -70,7 +70,7 @@ func generateApiClient(f *codegen.File, services []protoreflect.ServiceDescripto
 	f.P(t(1), "/// Closes all service clients and releases resources.")
 	f.P(t(1), "void dispose() {")
 	for _, svc := range sortedServices {
-		fieldName := lowerFirst(string(svc.Name()))
+		fieldName := codegen.LowerFirst(string(svc.Name()))
 		f.P(t(2), "_", fieldName, " = null;")
 	}
 	f.P(t(1), "}")

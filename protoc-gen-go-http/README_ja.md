@@ -4,7 +4,7 @@
 
 `protoc-gen-go-http` は [`google.api.http`](https://github.com/googleapis/googleapis/blob/master/google/api/http.proto) アノテーションに基づいて、Protobuf サービス向けに Go HTTP サーバーコード（gRPC HTTP ゲートウェイ）を生成する [protoc](https://github.com/protocolbuffers/protobuf) プラグインです。
 
-生成されるコードは標準ライブラリ `net/http` に基づいており、[`go-wind-toolkit`](https://github.com/tx7do/go-wind-toolkit) の `transport/http/binding` パッケージを使用してリクエストバインディング、ルーティング登録、レスポンス出力を行います。
+生成されるコードは標準ライブラリ `net/http` に基づいており、[`go-wind-plugins`](https://github.com/tx7do/go-wind-plugins) の `transport/http/binding` パッケージを使用してリクエストバインディング、ルーティング登録、レスポンス出力を行います。
 
 ## 特徴
 
@@ -119,7 +119,7 @@ func (s *greeterServer) CreateHello(ctx context.Context, req *pb.CreateHelloRequ
 ```go
 func main() {
     mux := http.NewServeMux()
-    router := binding.NewRouter(mux) // go-wind-toolkit の Router を使用
+    router := binding.NewRouter(mux) // go-wind-plugins の Router を使用
     pb.RegisterGreeterHTTPServer(router, &greeterServer{})
     http.ListenAndServe(":8080", mux)
 }
@@ -248,6 +248,7 @@ protoc-gen-go-http/
 ├── httpTemplate.tpl     # コード生成テンプレート
 ├── version.go           # バージョン定義
 ├── http_test.go         # ユニットテスト
+├── template_stream_test.go # ストリーミングテンプレートのユニットテスト
 ├── go.mod               # Go モジュール定義
 └── go.sum               # 依存関係検証
 ```

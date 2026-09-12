@@ -4,7 +4,7 @@
 
 `protoc-gen-go-http` is a [protoc](https://github.com/protocolbuffers/protobuf) plugin that generates Go HTTP server code (a gRPC HTTP gateway) for Protobuf services based on the [`google.api.http`](https://github.com/googleapis/googleapis/blob/master/google/api/http.proto) annotation.
 
-The generated code is built on the standard library `net/http` and uses the [`go-wind-toolkit`](https://github.com/tx7do/go-wind-toolkit) `transport/http/binding` package for request binding, route registration and response writing.
+The generated code is built on the standard library `net/http` and uses the [`go-wind-plugins`](https://github.com/tx7do/go-wind-plugins) `transport/http/binding` package for request binding, route registration and response writing.
 
 ## Features
 
@@ -248,6 +248,7 @@ protoc-gen-go-http/
 ├── httpTemplate.tpl     # Code generation template
 ├── version.go           # Version definition
 ├── http_test.go         # Unit tests
+├── template_stream_test.go # Streaming-template unit tests
 ├── go.mod               # Go module definition
 └── go.sum               # Dependency verification
 ```

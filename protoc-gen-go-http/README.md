@@ -4,7 +4,7 @@
 
 `protoc-gen-go-http` 是一个 [protoc](https://github.com/protocolbuffers/protobuf) 插件，它根据 [`google.api.http`](https://github.com/googleapis/googleapis/blob/master/google/api/http.proto) 注解，为 Protobuf 服务生成 Go HTTP 服务端代码（gRPC HTTP 网关）。
 
-生成的代码基于标准库 `net/http`，并通过 [`go-wind-toolkit`](https://github.com/tx7do/go-wind-toolkit) 的 `transport/http/binding` 包完成请求参数绑定、路由注册与统一响应输出。
+生成的代码基于标准库 `net/http`，并通过 [`go-wind-plugins`](https://github.com/tx7do/go-wind-plugins) 的 `transport/http/binding` 包完成请求参数绑定、路由注册与统一响应输出。
 
 ## 特性
 
@@ -119,7 +119,7 @@ func (s *greeterServer) CreateHello(ctx context.Context, req *pb.CreateHelloRequ
 ```go
 func main() {
     mux := http.NewServeMux()
-    router := binding.NewRouter(mux) // 使用 go-wind-toolkit 的 Router
+    router := binding.NewRouter(mux) // 使用 go-wind-plugins 的 Router
     pb.RegisterGreeterHTTPServer(router, &greeterServer{})
     http.ListenAndServe(":8080", mux)
 }
@@ -248,6 +248,7 @@ protoc-gen-go-http/
 ├── httpTemplate.tpl     # 代码生成模板
 ├── version.go           # 版本号定义
 ├── http_test.go         # 单元测试
+├── template_stream_test.go # 流式生成模板单元测试
 ├── go.mod               # Go 模块定义
 └── go.sum               # 依赖校验
 ```

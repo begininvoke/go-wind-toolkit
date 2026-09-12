@@ -12,7 +12,27 @@ env:
   CGO_ENABLED: 0
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: protoc-gen-typescript-http/go.mod
+          cache-dependency-path: protoc-gen-typescript-http/go.sum
+
+      - name: Test
+        working-directory: protoc-gen-typescript-http
+        env:
+          GOWORK: off
+        run: go test ./...
+
   build:
+    needs: test
     strategy:
       matrix:
         include:

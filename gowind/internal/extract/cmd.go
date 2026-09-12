@@ -37,8 +37,9 @@ Examples:
   gow extract admin user --obj role,permission
   gow extract admin user --obj role --orm ent
   gow extract admin user --obj role --keep-source`,
-	Args: cobra.ExactArgs(2),
-	RunE: runExtract,
+	Args:         cobra.ExactArgs(2),
+	RunE:         runExtract,
+	SilenceUsage: true,
 }
 
 func init() {
@@ -47,25 +48,6 @@ func init() {
 	CmdExtract.Flags().BoolVarP(&extractKeepSrc, "keep-source", "", false, "Keep source files instead of deleting them")
 	CmdExtract.Flags().BoolVarP(&extractDryRun, "dry-run", "n", false, "Preview all file actions (copy/modify/delete) without touching anything")
 	CmdExtract.Flags().BoolVarP(&extractYes, "yes", "y", false, "Skip the deletion confirmation prompt (for scripts)")
-}
-
-func extractProjectName(module string) string {
-	module = strings.TrimSpace(module)
-	if module == "" {
-		return ""
-	}
-
-	if strings.Contains(module, "/") {
-		parts := strings.Split(module, "/")
-		for i := len(parts) - 1; i >= 0; i-- {
-			seg := strings.TrimSpace(parts[i])
-			if seg != "" {
-				return seg
-			}
-		}
-	}
-
-	return module
 }
 
 func runExtract(cmd *cobra.Command, args []string) error {
@@ -121,7 +103,7 @@ func runExtract(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Auto-detected ORM type: %s\n", ormType)
 	}
 
-	projectName := extractProjectName(inspector.ModPath)
+	projectName := pkg.ExtractProjectName(inspector.ModPath)
 
 	opts := pkgExtract.Options{
 		RootPath:      inspector.Root,

@@ -18,7 +18,7 @@ func WriteGrpcServiceProto(outputPath string, data GrpcProtoTemplateData) error 
 	//log.Printf("Writing gRPC service proto to: [%s] [%s] [%s] [%s]",
 	//	outputPath, data.Module, data.Name, data.Comment)
 
-	if err := os.MkdirAll(outputPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputPath, 0o755); err != nil {
 		return err
 	}
 
@@ -44,7 +44,7 @@ func WriteRestServiceProto(outputPath string, data RestProtoTemplateData) error 
 	outputPath = filepath.Join(outputPath, strings.ToLower(data.TargetModule), "service", strings.ToLower(data.Version))
 	outputPath = filepath.Clean(outputPath)
 
-	if err := os.MkdirAll(outputPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputPath, 0o755); err != nil {
 		return err
 	}
 

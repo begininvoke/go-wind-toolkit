@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
 )
 
 // ==============================
@@ -15,7 +17,7 @@ import (
 func TestDetectOrmType_Ent(t *testing.T) {
 	tmpDir := t.TempDir()
 	entSchemaPath := filepath.Join(tmpDir, "internal", "data", "ent", "schema")
-	err := os.MkdirAll(entSchemaPath, os.ModePerm)
+	err := os.MkdirAll(entSchemaPath, 0o755)
 	assert.Nil(t, err)
 
 	result := DetectOrmType(tmpDir)
@@ -25,7 +27,7 @@ func TestDetectOrmType_Ent(t *testing.T) {
 func TestDetectOrmType_Gorm(t *testing.T) {
 	tmpDir := t.TempDir()
 	gormSchemaPath := filepath.Join(tmpDir, "internal", "data", "gorm", "schema")
-	err := os.MkdirAll(gormSchemaPath, os.ModePerm)
+	err := os.MkdirAll(gormSchemaPath, 0o755)
 	assert.Nil(t, err)
 
 	result := DetectOrmType(tmpDir)
@@ -42,10 +44,10 @@ func TestDetectOrmType_None(t *testing.T) {
 func TestDetectOrmType_EntPriorityOverGorm(t *testing.T) {
 	tmpDir := t.TempDir()
 	entSchemaPath := filepath.Join(tmpDir, "internal", "data", "ent", "schema")
-	err := os.MkdirAll(entSchemaPath, os.ModePerm)
+	err := os.MkdirAll(entSchemaPath, 0o755)
 	assert.Nil(t, err)
 	gormSchemaPath := filepath.Join(tmpDir, "internal", "data", "gorm", "schema")
-	err = os.MkdirAll(gormSchemaPath, os.ModePerm)
+	err = os.MkdirAll(gormSchemaPath, 0o755)
 	assert.Nil(t, err)
 
 	result := DetectOrmType(tmpDir)
@@ -91,16 +93,16 @@ func TestIsFileExists_True(t *testing.T) {
 	err := os.WriteFile(tmpFile, []byte("package test"), 0644)
 	assert.Nil(t, err)
 
-	assert.True(t, isFileExists(tmpFile))
+	assert.True(t, pkg.IsFileExists(tmpFile))
 }
 
 func TestIsFileExists_False_NotExist(t *testing.T) {
-	assert.False(t, isFileExists("/nonexistent/file.go"))
+	assert.False(t, pkg.IsFileExists("/nonexistent/file.go"))
 }
 
 func TestIsFileExists_False_IsDir(t *testing.T) {
 	tmpDir := t.TempDir()
-	assert.False(t, isFileExists(tmpDir))
+	assert.False(t, pkg.IsFileExists(tmpDir))
 }
 
 func TestIsDirExists_True(t *testing.T) {

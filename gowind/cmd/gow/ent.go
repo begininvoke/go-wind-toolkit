@@ -14,21 +14,24 @@ var entCmd = &cobra.Command{
   gow ent generate admin        same as above (explicit subcommand)
   gow ent admin1 admin2         generate for multiple services
   gow ent add admin User,Group  add schema(s) to a service, then regenerate`,
-	RunE: ent.RunGenerate,
+	RunE:         ent.RunGenerate,
+	SilenceUsage: true,
 }
 
 var entGenerateCmd = &cobra.Command{
 	Use:   "generate <service>",
 	Short: "generate ent code for a service",
 	//Args:  cobra.MinimumNArgs(1),
-	RunE: ent.RunGenerate,
+	RunE:         ent.RunGenerate,
+	SilenceUsage: true,
 }
 
 var entAddCmd = &cobra.Command{
-	Use:   "add <service> <schemas>",
-	Short: "add schema(s) to a service (comma separated, e.g. User,Group)",
-	Args:  cobra.MinimumNArgs(2),
-	RunE:  ent.RunAdd,
+	Use:          "add <service> <schemas>",
+	Short:        "add schema(s) to a service (comma separated, e.g. User,Group)",
+	Args:         cobra.MinimumNArgs(2),
+	RunE:         ent.RunAdd,
+	SilenceUsage: true,
 }
 
 func init() {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/tx7do/go-utils/stringcase"
 
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/generators"
 )
 
@@ -56,11 +57,11 @@ func (e *Extractor) Plan() (*Plan, error) {
 	for _, model := range e.opts.Models {
 		for _, pair := range e.modelFilePairs(model) {
 			src, dst := pair[0], pair[1]
-			if !isFileExists(src) {
+			if !pkg.IsFileExists(src) {
 				p.Warnings = append(p.Warnings, fmt.Sprintf("missing source file (execution will fail): %s", src))
 				continue
 			}
-			p.CopyFiles = append(p.CopyFiles, FileCopy{Src: src, Dst: dst, Overwrite: isFileExists(dst)})
+			p.CopyFiles = append(p.CopyFiles, FileCopy{Src: src, Dst: dst, Overwrite: pkg.IsFileExists(dst)})
 		}
 	}
 
@@ -70,7 +71,7 @@ func (e *Extractor) Plan() (*Plan, error) {
 	if !e.opts.KeepSource {
 		for _, model := range e.opts.Models {
 			for _, pair := range e.modelFilePairs(model) {
-				if isFileExists(pair[0]) {
+				if pkg.IsFileExists(pair[0]) {
 					p.DeletedFiles = append(p.DeletedFiles, pair[0])
 				}
 			}
@@ -132,7 +133,7 @@ func (e *Extractor) targetModifiedCandidates() []string {
 			filepath.Join(target, "internal", "data", "providers", "wire_set.go"),
 			filepath.Join(target, "internal", "service", "providers", "wire_set.go"),
 		} {
-			if isFileExists(f) {
+			if pkg.IsFileExists(f) {
 				out = append(out, f)
 			}
 		}
@@ -142,7 +143,7 @@ func (e *Extractor) targetModifiedCandidates() []string {
 		filepath.Join(target, "internal", "server", "grpc_server.go"),
 		filepath.Join(target, "internal", "server", "rest_server.go"),
 	} {
-		if isFileExists(f) {
+		if pkg.IsFileExists(f) {
 			out = append(out, f)
 		}
 	}
@@ -162,7 +163,7 @@ func (e *Extractor) sourceModifiedCandidates() []string {
 		filepath.Join(source, "internal", "data", "providers", "wire_set.go"),
 		filepath.Join(source, "internal", "service", "providers", "wire_set.go"),
 	} {
-		if isFileExists(f) {
+		if pkg.IsFileExists(f) {
 			out = append(out, f)
 		}
 	}

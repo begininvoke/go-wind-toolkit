@@ -61,7 +61,7 @@ func TestWriteServerPackageCode_Grpc(t *testing.T) {
 	g := NewGenerator()
 	tmpDir := t.TempDir()
 	outputPath := filepath.Join(tmpDir, "app", "user", "service", "internal", "server")
-	err := os.MkdirAll(outputPath, os.ModePerm)
+	err := os.MkdirAll(outputPath, 0o755)
 	assert.Nil(t, err)
 
 	services := map[string]string{"user": "user", "role": "user"}
@@ -82,7 +82,7 @@ func TestWriteServerPackageCode_Rest(t *testing.T) {
 	g := NewGenerator()
 	tmpDir := t.TempDir()
 	outputPath := filepath.Join(tmpDir, "app", "user", "service", "internal", "server")
-	err := os.MkdirAll(outputPath, os.ModePerm)
+	err := os.MkdirAll(outputPath, 0o755)
 	assert.Nil(t, err)
 
 	services := map[string]string{"user": "user", "role": "user"}

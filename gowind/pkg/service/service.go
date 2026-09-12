@@ -10,6 +10,7 @@ import (
 	"github.com/tx7do/go-utils/code_generator"
 	"github.com/tx7do/go-utils/stringcase"
 
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/generators"
 )
 
@@ -314,7 +315,7 @@ func (g *Generator) generateMainPackageCode(
 // writeMakefile 生成默认的 Makefile 到指定目录。
 func (g *Generator) writeMakefile(outputPath string) error {
 	outputPath = filepath.Clean(outputPath)
-	if err := os.MkdirAll(outputPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputPath, 0o755); err != nil {
 		return err
 	}
 
@@ -361,7 +362,7 @@ func (g *Generator) writeConfigs(outputPath string) error {
 
 // appendServiceName 向 pkg/serviceid/service_id.go 文件追加服务名称常量定义。
 func (g *Generator) appendServiceName(outputPath string, projectName, serviceName string, isBff bool) error {
-	if err := os.MkdirAll(outputPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputPath, 0o755); err != nil {
 		return fmt.Errorf("create pkg/serviceid dir: %w", err)
 	}
 
@@ -380,7 +381,7 @@ func (g *Generator) appendServiceName(outputPath string, projectName, serviceNam
 	serviceNamePath := filepath.Join(outputPath, "service_id.go")
 
 	// 文件不存在：创建包含 const 块的初始文件
-	if !isFileExists(serviceNamePath) {
+	if !pkg.IsFileExists(serviceNamePath) {
 		content := fmt.Sprintf("package service\n\nconst (\n%s\n)\n", fieldLine)
 		if err := os.WriteFile(serviceNamePath, []byte(content), 0644); err != nil {
 			return fmt.Errorf("write service name file: %w", err)
@@ -426,7 +427,7 @@ func (g *Generator) appendServiceName(outputPath string, projectName, serviceNam
 
 // writeAssets 生成 assets 包代码到指定目录。
 func (g *Generator) writeAssets(outputPath string) error {
-	if err := os.MkdirAll(outputPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(outputPath, 0o755); err != nil {
 		return fmt.Errorf("create assets dir: %w", err)
 	}
 
@@ -510,13 +511,4 @@ func (g *Generator) writeWireCode(
 	}
 	_, err := g.goGenerator.GenerateWire(context.Background(), opts)
 	return err
-}
-
-// isFileExists 检查文件是否存在且不是目录
-func isFileExists(path string) bool {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !fi.IsDir()
 }

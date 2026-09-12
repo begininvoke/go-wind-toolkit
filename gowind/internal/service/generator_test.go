@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
 )
 
 func TestGenerate(t *testing.T) {
@@ -30,10 +32,10 @@ func TestGenerate(t *testing.T) {
 
 func TestExtractProjectName(t *testing.T) {
 	projectModule := "github.com/gowind-example"
-	projectName := extractProjectName(projectModule)
+	projectName := pkg.ExtractProjectName(projectModule)
 	assert.Equal(t, "gowind-example", projectName)
 
 	projectModule = "gowind-example"
-	projectName = extractProjectName(projectModule)
+	projectName = pkg.ExtractProjectName(projectModule)
 	assert.Equal(t, "gowind-example", projectName)
 }

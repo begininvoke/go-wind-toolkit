@@ -62,7 +62,7 @@ func WriteSchema(mutations []schemast.Mutator, opts ...ImportOption) error {
 	for _, apply := range opts {
 		apply(i)
 	}
-	if err := os.MkdirAll(i.schemaPath, os.ModePerm); err != nil {
+	if err := os.MkdirAll(i.schemaPath, 0o755); err != nil {
 		return err
 	}
 	ctx, err := schemast.Load(i.schemaPath)

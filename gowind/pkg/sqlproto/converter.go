@@ -34,7 +34,7 @@ func Convert(
 		return nil, errors.New("sqlproto: proto module is nil")
 	}
 
-	_ = os.MkdirAll(*outputPath, os.ModePerm)
+	_ = os.MkdirAll(*outputPath, 0o755)
 
 	// Normalize the DSN to ensure it has a valid scheme
 	normalizedDSN := normalizeDSN(*dsn)

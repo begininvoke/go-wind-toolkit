@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/tx7do/go-utils/stringcase"
+	"github.com/tx7do/go-wind-toolkit/gowind/internal/pkg"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/generators"
 	"github.com/tx7do/go-wind-toolkit/gowind/pkg/service"
 )
@@ -321,14 +322,14 @@ func (e *Extractor) updateTargetServer() error {
 	}
 
 	grpcServerFile := filepath.Join(e.targetServicePath(), "internal", "server", "grpc_server.go")
-	if isFileExists(grpcServerFile) {
+	if pkg.IsFileExists(grpcServerFile) {
 		if err := e.addServiceToGrpcServer(grpcServerFile, tctx); err != nil {
 			return fmt.Errorf("update grpc server: %w", err)
 		}
 	}
 
 	restServerFile := filepath.Join(e.targetServicePath(), "internal", "server", "rest_server.go")
-	if isFileExists(restServerFile) {
+	if pkg.IsFileExists(restServerFile) {
 		if err := e.addServiceToRestServer(restServerFile, tctx); err != nil {
 			return fmt.Errorf("update rest server: %w", err)
 		}
@@ -423,7 +424,7 @@ func (e *Extractor) copyAndReplaceImport(srcFile, dstFile string) error {
 	content = strings.ReplaceAll(content, oldApi, newApi)
 
 	dstDir := filepath.Dir(dstFile)
-	if err = os.MkdirAll(dstDir, os.ModePerm); err != nil {
+	if err = os.MkdirAll(dstDir, 0o755); err != nil {
 		return fmt.Errorf("create target dir %s: %w", dstDir, err)
 	}
 
@@ -435,14 +436,14 @@ func (e *Extractor) copyAndReplaceImport(srcFile, dstFile string) error {
 }
 
 func (e *Extractor) upsertProvider(filePath string, functionCall string) error {
-	if !isFileExists(filePath) {
+	if !pkg.IsFileExists(filePath) {
 		return fmt.Errorf("provider file not found: %s", filePath)
 	}
 	return e.goGen.UpsertProviderSetFunction(filePath, functionCall)
 }
 
 func (e *Extractor) removeProvider(filePath string, functionCall string) error {
-	if !isFileExists(filePath) {
+	if !pkg.IsFileExists(filePath) {
 		return nil
 	}
 
@@ -634,14 +635,14 @@ func (e *Extractor) addServiceToRestServer(filePath string, tctx targetContext) 
 
 func (e *Extractor) removeSourceServerRegistrations() error {
 	grpcServerFile := filepath.Join(e.sourceServicePath(), "internal", "server", "grpc_server.go")
-	if isFileExists(grpcServerFile) {
+	if pkg.IsFileExists(grpcServerFile) {
 		if err := e.removeServiceFromServer(grpcServerFile, "Server"); err != nil {
 			return err
 		}
 	}
 
 	restServerFile := filepath.Join(e.sourceServicePath(), "internal", "server", "rest_server.go")
-	if isFileExists(restServerFile) {
+	if pkg.IsFileExists(restServerFile) {
 		if err := e.removeServiceFromServer(restServerFile, "HTTPServer"); err != nil {
 			return err
 		}
@@ -711,15 +712,6 @@ func injectBeforeMarker(content string, marker string, line string) (string, err
 		return "", fmt.Errorf("marker %q not found in file", marker)
 	}
 	return content[:idx] + line + "\n" + content[idx:], nil
-}
-
-// isFileExists 检查文件是否存在且不是目录
-func isFileExists(path string) bool {
-	fi, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return !fi.IsDir()
 }
 
 // isDirExists 检查目录是否存在

@@ -12,7 +12,8 @@ var wireCmd = &cobra.Command{
 	Long: `Run the Wire tool in the specified service directory to generate dependency injection code.
 Usage example: wire <service>
 The command executes in the project's app/<service>/service directory and forwards stdout/stderr to the console.`,
-	RunE: wire.RunGenerate,
+	RunE:         wire.RunGenerate,
+	SilenceUsage: true,
 }
 
 func init() {

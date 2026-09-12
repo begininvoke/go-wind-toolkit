@@ -156,13 +156,12 @@ func IsDirExists(dir string) bool {
 	return false
 }
 
+// IsFileExists 检查路径是否为已存在的普通文件。
+// 与 IsDirExists 不同：任何 stat 错误（含不存在与权限错误）一律返回 false。
 func IsFileExists(filePath string) bool {
 	fi, err := os.Stat(filePath)
-	if err == nil {
-		return !fi.IsDir()
-	}
-	if os.IsNotExist(err) {
+	if err != nil {
 		return false
 	}
-	return true
+	return !fi.IsDir()
 }

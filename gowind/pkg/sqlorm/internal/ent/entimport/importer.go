@@ -19,7 +19,7 @@ func Importer(ctx context.Context, dsn, schemaPath *string, includeTables, exclu
 		return errors.New("entimport: dsn is nil")
 	}
 
-	_ = os.MkdirAll(*schemaPath, os.ModePerm)
+	_ = os.MkdirAll(*schemaPath, 0o755)
 
 	// Normalize the DSN to ensure it has a valid scheme
 	normalizedDSN := normalizeDSN(*dsn)

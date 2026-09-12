@@ -12,12 +12,12 @@ import (
 
 // CmdService represents the service command
 var CmdService = &cobra.Command{
-	Use:     "service [name]",
-	Aliases: []string{"svc"},
-	Short:   "create a new service scaffold",
-	Long:    "Create a new microservice inside the current workspace. Example: gow new service user",
-	Args:    cobra.ExactArgs(1),
-	RunE:    Run,
+	Use:          "service [name]",
+	Aliases:      []string{"svc"},
+	Short:        "create a new service scaffold",
+	Long:         "Create a new microservice inside the current workspace. Example: gow new service user",
+	Args:         cobra.ExactArgs(1),
+	RunE:         Run,
 	SilenceUsage: true,
 }
 
@@ -37,25 +37,6 @@ func init() {
 	CmdService.Flags().StringArrayVarP(&DbClients, "db-clients", "d", []string{"ent"}, "Specify which database clients to generate (gorm, ent, redis, clickhouse...)")
 	CmdService.Flags().BoolVar(&useWireDI, "wire", false, "生成旧式 wire 依赖注入(wire.go + providers);默认生成手写装配 wiring.go")
 	CmdService.Flags().BoolVarP(&dryRun, "dry-run", "n", false, "Preview the service layout without creating anything")
-}
-
-func extractProjectName(module string) string {
-	module = strings.TrimSpace(module)
-	if module == "" {
-		return ""
-	}
-
-	if strings.Contains(module, "/") {
-		parts := strings.Split(module, "/")
-		for i := len(parts) - 1; i >= 0; i-- {
-			seg := strings.TrimSpace(parts[i])
-			if seg != "" {
-				return seg
-			}
-		}
-	}
-
-	return module
 }
 
 func Run(cmd *cobra.Command, args []string) error {
@@ -109,14 +90,14 @@ func Run(cmd *cobra.Command, args []string) error {
 			fmt.Printf("      internal/server/%s_server.go\n", srv)
 		}
 		fmt.Printf("      internal/service/  (business services)\n")
-			for _, cli := range DbClients {
-				fmt.Printf("      internal/data/client/%s_client.go\n", cli)
-			}
-			fmt.Printf("\033[36m[DRY-RUN] preview only — nothing was created.\033[m\n")
-			return nil
+		for _, cli := range DbClients {
+			fmt.Printf("      internal/data/client/%s_client.go\n", cli)
 		}
+		fmt.Printf("\033[36m[DRY-RUN] preview only — nothing was created.\033[m\n")
+		return nil
+	}
 
-		return Generate(cmd.Context(), GeneratorOptions{
+	return Generate(cmd.Context(), GeneratorOptions{
 		GenerateMain:     true,
 		GenerateServer:   true,
 		GenerateService:  true,
@@ -124,7 +105,7 @@ func Run(cmd *cobra.Command, args []string) error {
 		GenerateMakefile: true,
 		GenerateConfigs:  true,
 
-		ProjectName:   extractProjectName(inspector.ModPath),
+		ProjectName:   pkg.ExtractProjectName(inspector.ModPath),
 		ProjectModule: inspector.ModPath,
 		ServiceName:   serviceName,
 

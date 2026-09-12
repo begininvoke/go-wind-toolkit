@@ -33,7 +33,7 @@ func RunGenerate(cmd *cobra.Command, args []string) error {
 	}
 
 	apiPath := filepath.Join(inspector.Root, "api")
-	if !isDirExists(apiPath) {
+	if !pkg.IsDirExists(apiPath) {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: api directory does not exist: %s\033[m\n", apiPath)
 		return fmt.Errorf("api directory does not exist: %s", apiPath)
 	}
@@ -49,7 +49,7 @@ func GenerateFromPath(ctx context.Context, apiPath string) error {
 		return err
 	}
 
-	if !isDirExists(apiPath) {
+	if !pkg.IsDirExists(apiPath) {
 		_, _ = fmt.Fprintf(os.Stderr, "\033[31mERROR: api directory does not exist: %s\033[m\n", apiPath)
 		return fmt.Errorf("api directory does not exist: %s", apiPath)
 	}
@@ -147,14 +147,6 @@ func scanYAMLFiles(root string) ([]string, error) {
 		return nil, err
 	}
 	return files, nil
-}
-
-// isDirExists 检查目录是否存在。
-func isDirExists(path string) bool {
-	if _, err := os.Stat(path); !os.IsNotExist(err) {
-		return true
-	}
-	return false
 }
 
 // checkBuffInstalled 执行 `buf --version` 来探测 buf 是否安装。

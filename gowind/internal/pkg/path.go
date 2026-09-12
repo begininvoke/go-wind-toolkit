@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 )
 
@@ -99,15 +98,6 @@ func hasSets(name string, sets []string) bool {
 	return false
 }
 
-func Tree(path string, dir string) {
-	_ = filepath.Walk(path, func(path string, info os.FileInfo, err error) error {
-		if err == nil && info != nil && !info.IsDir() {
-			fmt.Printf("%s %s (%v bytes)\n", color.GreenString("CREATED"), strings.ReplaceAll(path, dir+"/", ""), info.Size())
-		}
-		return nil
-	})
-}
-
 func SplitArgs(cmd *cobra.Command, args []string) (cmdArgs, programArgs []string) {
 	dashAt := cmd.ArgsLenAtDash()
 	if dashAt >= 0 {
@@ -155,22 +145,23 @@ func HasCmdAndConfigs(dir string) (bool, bool, error) {
 
 // ExtractServiceName 从 currentDir 中提取服务名称，前提是 currentDir 位于 projectRootPath 之下，并且路径结构符合 app/{service}/service/cmd/server。
 func ExtractServiceName(projectRootPath, currentDir string) (string, error) {
-	relativePath := strings.TrimPrefix(currentDir, projectRootPath)
-	if relativePath == currentDir {
+	// filepath.Rel 把根目录之外的路径归一为 ".." 形态；两条分支都必须拒绝，
+	// 否则根目录的兄弟前缀目录（如根 /x/ab 与目录 /x/abc）会被误当作根内路径。
+	rel, relErr := filepath.Rel(projectRootPath, currentDir)
+	if relErr != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
 		return "", fmt.Errorf("current directory is not within the project root")
 	}
 
-	pathParts := strings.Split(relativePath, string(os.PathSeparator))
-	if len(pathParts) < 4 {
+	pathParts := strings.Split(rel, string(os.PathSeparator))
+	if len(pathParts) < 3 {
 		return "", nil
 	}
 
-	if strings.TrimSpace(pathParts[1]) != "app" || strings.TrimSpace(pathParts[3]) != "service" {
-		log.Printf("[%s][%s][%s][%s]\n", pathParts[0], pathParts[1], pathParts[2], pathParts[3])
+	if strings.TrimSpace(pathParts[0]) != "app" || strings.TrimSpace(pathParts[2]) != "service" {
 		return "", fmt.Errorf("current directory does not match expected structure 'app/{service}/service/cmd/server'")
 	}
 
-	serviceName := strings.TrimSpace(pathParts[2]) // app/{service}/service/cmd/server
+	serviceName := strings.TrimSpace(pathParts[1]) // app/{service}/service/cmd/server
 	if serviceName == "" {
 		return "", fmt.Errorf("service name is empty")
 	}
@@ -188,6 +179,26 @@ func ExtractServiceName(projectRootPath, currentDir string) (string, error) {
 	}
 
 	return serviceName, nil
+}
+
+// ExtractProjectName 从 Go module 路径中提取项目名(路径最后一段非空片段)。
+func ExtractProjectName(module string) string {
+	module = strings.TrimSpace(module)
+	if module == "" {
+		return ""
+	}
+
+	if strings.Contains(module, "/") {
+		parts := strings.Split(module, "/")
+		for i := len(parts) - 1; i >= 0; i-- {
+			seg := strings.TrimSpace(parts[i])
+			if seg != "" {
+				return seg
+			}
+		}
+	}
+
+	return module
 }
 
 // IsValidServiceName 检查 serviceName 是否为 projectRootPath 下的有效服务名称，即 app/{serviceName}/service/cmd/server 存在，并且 app/{serviceName}/configs 目录存在。

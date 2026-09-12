@@ -22,8 +22,8 @@ func Importer(_ context.Context, drv, dsn, schemaPath, daoPath *string, tables, 
 		return errors.New("gormimport: dsn is nil")
 	}
 
-	_ = os.MkdirAll(*schemaPath, os.ModePerm)
-	_ = os.MkdirAll(*daoPath, os.ModePerm)
+	_ = os.MkdirAll(*schemaPath, 0o755)
+	_ = os.MkdirAll(*daoPath, 0o755)
 
 	// 判断是 SQL 文本还是数据库连接串
 	// SQL 文本包含 CREATE TABLE 语句，而 DSN 包含 :// 协议头

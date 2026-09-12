@@ -3,7 +3,6 @@ package sqlproto
 import (
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/jinzhu/inflection"
@@ -52,7 +51,7 @@ func WriteServiceProto(
 			Version: moduleVersion,
 
 			Name:    modelName,
-			Comment: RemoveTableCommentSuffix(tableComment),
+			Comment: generators.RemoveTableCommentSuffix(tableComment),
 			Fields:  render.ProtoFieldArray(protoFields),
 		}
 		return render.WriteGrpcServiceProto(outputPath, data)
@@ -64,7 +63,7 @@ func WriteServiceProto(
 			Version:      moduleVersion,
 
 			Name:    modelName,
-			Comment: RemoveTableCommentSuffix(tableComment),
+			Comment: generators.RemoveTableCommentSuffix(tableComment),
 		}
 		return render.WriteRestServiceProto(outputPath, data)
 
@@ -119,7 +118,3 @@ func WriteServicesProto(
 	return nil
 }
 
-func RemoveTableCommentSuffix(input string) string {
-	re := regexp.MustCompile(`(表|table)$`)
-	return re.ReplaceAllString(input, "")
-}

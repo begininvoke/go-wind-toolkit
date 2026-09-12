@@ -6,10 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // Service AI 服务层
 type Service struct {
+	// mu 保护 config/client:Wails 绑定调用各自在独立 goroutine 中执行,
+	// "测试连接"与"生成/配置保存"并发时存在数据竞争。
+	mu     sync.Mutex
 	client *Client
 	config *Config
 }
@@ -21,13 +25,18 @@ func NewService() *Service {
 	}
 }
 
-// GetConfig 获取当前配置
+// GetConfig 获取当前配置(副本)
 func (s *Service) GetConfig() *Config {
-	return s.config
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cfg := *s.config
+	return &cfg
 }
 
 // SetConfig 设置配置、重建客户端并持久化到磁盘(持久化失败不影响本次生效)。
 func (s *Service) SetConfig(config *Config) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.config = config
 	s.client = NewClient(config)
 	if err := SaveConfig(config); err != nil {
@@ -38,12 +47,16 @@ func (s *Service) SetConfig(config *Config) {
 // SetConfigTransient 设置配置并重建客户端,但不持久化。
 // CLI 等由环境变量/旗标临时构造配置的场景使用,避免把临时值写进用户配置。
 func (s *Service) SetConfigTransient(config *Config) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.config = config
 	s.client = NewClient(config)
 }
 
 // GetClient 获取客户端（懒加载）
 func (s *Service) GetClient() *Client {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.client == nil {
 		s.client = NewClient(s.config)
 	}

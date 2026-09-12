@@ -62,9 +62,6 @@ func buildDBConfig(cmd *cobra.Command) database.DBConfig {
 	}
 	cfg.Port = port
 
-	if cfg.Type == database.DbTypeOracle {
-		checkErr(fmt.Errorf("oracle 连接暂不可用（上游驱动名错配），请使用 mysql/postgresql/sqlite 或提供 DDL 文件"))
-	}
 	return cfg
 }
 

@@ -24,11 +24,11 @@ export namespace ai {
 	    model: string;
 	    temperature: number;
 	    maxTokens: number;
-
+	
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
 	    }
-
+	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = source["provider"];
@@ -154,6 +154,11 @@ export namespace configexporter {
 	    group: string;
 	    env: string;
 	    namespaceId: string;
+	    username: string;
+	    password: string;
+	    caCertPem: string;
+	    clientCertPem: string;
+	    clientKeyPem: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new RemoteConfig(source);
@@ -167,6 +172,11 @@ export namespace configexporter {
 	        this.group = source["group"];
 	        this.env = source["env"];
 	        this.namespaceId = source["namespaceId"];
+	        this.username = source["username"];
+	        this.password = source["password"];
+	        this.caCertPem = source["caCertPem"];
+	        this.clientCertPem = source["clientCertPem"];
+	        this.clientKeyPem = source["clientKeyPem"];
 	    }
 	}
 	export class ServiceInfo {
@@ -427,6 +437,7 @@ export namespace devtools {
 	    success: boolean;
 	    output: string;
 	    error?: string;
+	    dir?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new CommandResult(source);
@@ -437,6 +448,7 @@ export namespace devtools {
 	        this.success = source["success"];
 	        this.output = source["output"];
 	        this.error = source["error"];
+	        this.dir = source["dir"];
 	    }
 	}
 	export class CreateProjectOptions {
@@ -486,32 +498,6 @@ export namespace devtools {
 
 }
 
-export namespace generator {
-	
-	export class Option {
-	    id: number;
-	    tableName: string;
-	    service: string;
-	    exclude: boolean;
-	    protoPackage: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Option(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.tableName = source["tableName"];
-	        this.service = source["service"];
-	        this.exclude = source["exclude"];
-	        this.protoPackage = source["protoPackage"];
-	    }
-	}
-
-}
-
-
 export namespace frontendgen {
 	
 	export class GeneratedFile {
@@ -539,8 +525,8 @@ export namespace frontendgen {
 	    tsType: string;
 	    description: string;
 	    isEnum: boolean;
-	    enumValues?: string[];
-	    format?: string;
+	    enumValues: string[];
+	    format: string;
 	    isArray: boolean;
 	    isBoolean: boolean;
 	    isDate: boolean;
@@ -614,9 +600,27 @@ export namespace frontendgen {
 	        this.clientGetterName = source["clientGetterName"];
 	        this.typePrefix = source["typePrefix"];
 	        this.basePath = source["basePath"];
-	        this.operations = source["operations"];
-	        this.fields = source["fields"];
+	        this.operations = this.convertValues(source["operations"], ParsedOperation);
+	        this.fields = this.convertValues(source["fields"], ParsedField);
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class WriteResult {
 	    path: string;
@@ -637,16 +641,41 @@ export namespace frontendgen {
 
 }
 
+export namespace generator {
+	
+	export class Option {
+	    id: number;
+	    tableName: string;
+	    service: string;
+	    exclude: boolean;
+	    protoPackage: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Option(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.tableName = source["tableName"];
+	        this.service = source["service"];
+	        this.exclude = source["exclude"];
+	        this.protoPackage = source["protoPackage"];
+	    }
+	}
+
+}
+
 export namespace main {
 	
 	export class FrontendGenParams {
 	    openapiYaml: string;
 	    framework: string;
-	    tags?: string[];
-	    generateTypes?: string[];
-	    serviceName?: string;
-	    modulePathMap?: Record<string, string>;
-	    autoRouterModules?: boolean;
+	    tags: string[];
+	    generateTypes: string[];
+	    serviceName: string;
+	    modulePathMap: Record<string, string>;
+	    autoRouterModules: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new FrontendGenParams(source);
@@ -664,7 +693,7 @@ export namespace main {
 	    }
 	}
 	export class FrontendPreviewResult {
-	    files?: frontendgen.GeneratedFile[];
+	    files: frontendgen.GeneratedFile[];
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -673,12 +702,30 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.files = source["files"];
+	        this.files = this.convertValues(source["files"], frontendgen.GeneratedFile);
 	        this.error = source["error"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class FrontendServicesResult {
-	    services?: frontendgen.ParsedService[];
+	    services: frontendgen.ParsedService[];
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -687,12 +734,30 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.services = source["services"];
+	        this.services = this.convertValues(source["services"], frontendgen.ParsedService);
 	        this.error = source["error"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class FrontendWriteResult {
-	    results?: frontendgen.WriteResult[];
+	    results: frontendgen.WriteResult[];
 	    error?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -701,9 +766,28 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.results = source["results"];
+	        this.results = this.convertValues(source["results"], frontendgen.WriteResult);
 	        this.error = source["error"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
+

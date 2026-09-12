@@ -64,8 +64,11 @@ async function handleCreateProject() {
     if (result.success) {
       message.success(t('devTools.create.success'))
       createVisible.value = false
-      const newPath = createForm.parentDir + '\\' + createForm.name
-      await OpenProject(newPath)
+      if (!result.dir) {
+        message.error(t('devTools.create.failed'))
+        return
+      }
+      await OpenProject(result.dir)
       emit('projectOpened')
     } else {
       message.error(result.error || t('devTools.create.failed'))

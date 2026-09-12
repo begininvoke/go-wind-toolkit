@@ -210,17 +210,25 @@ func getConfigFileList(folder string) []string {
 	return files
 }
 
+// httpClient 带超时的共享 HTTP 客户端:配置中心不可达或挂起时请求会在
+// 限时内失败,而不是永久占住 Wails 绑定 goroutine。
+var httpClient = &http.Client{Timeout: 30 * time.Second}
+
 // writeConsul 写入配置到 Consul
 func writeConsul(endpoint, project, app, content string) error {
-	key := fmt.Sprintf("%s/%s/service/config", project, app)
-	consulURL := fmt.Sprintf("http://%s/v1/kv/%s", endpoint, url.PathEscape(key))
+	// key 分段转义、保留 "/" 分隔符,与 etcd 路径形成的键形态一致;
+	// 整段 PathEscape 会把 "/" 编成 %2F,读侧按斜杠路径无法取回。
+	key := strings.Join([]string{
+		url.PathEscape(project), url.PathEscape(app), "service", "config",
+	}, "/")
+	consulURL := fmt.Sprintf("http://%s/v1/kv/%s", endpoint, key)
 
 	req, err := http.NewRequest("PUT", consulURL, strings.NewReader(content))
 	if err != nil {
 		return fmt.Errorf("创建 Consul 请求失败: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("写入 Consul 失败: %w", err)
 	}
@@ -363,7 +371,7 @@ func writeNacos(rc *RemoteConfig, app, content string) error {
 		form.Set("accessToken", token)
 	}
 
-	resp, err := http.PostForm(nacosURL, form)
+	resp, err := httpClient.PostForm(nacosURL, form)
 	if err != nil {
 		return fmt.Errorf("写入 Nacos 失败: %w", err)
 	}
@@ -388,7 +396,7 @@ func nacosLogin(endpoint, username, password string) (string, error) {
 	}
 	loginURL := fmt.Sprintf("%s://%s/nacos/v1/auth/login", scheme, strings.TrimPrefix(strings.TrimPrefix(endpoint, "https://"), "http://"))
 
-	resp, err := http.PostForm(loginURL, url.Values{
+	resp, err := httpClient.PostForm(loginURL, url.Values{
 		"username": {username},
 		"password": {password},
 	})

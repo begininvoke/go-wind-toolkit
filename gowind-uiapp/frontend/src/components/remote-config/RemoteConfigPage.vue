@@ -134,7 +134,7 @@ async function handleExportAll() {
 
   exporting.value = true
   try {
-    const result = await ExportConfigToRemote(remoteConfig as any)
+    const result = await ExportConfigToRemote(remoteConfig)
     if (result.success) {
       message.success(t('remoteConfig.export.success'))
     } else {
@@ -155,7 +155,7 @@ async function handleExportOne(serviceName: string) {
 
   exportingService.value = serviceName
   try {
-    const result = await ExportOneServiceConfig(remoteConfig as any, serviceName)
+    const result = await ExportOneServiceConfig(remoteConfig, serviceName)
     if (result.success) {
       message.success(t('remoteConfig.export.success') + ` (${serviceName})`)
     } else {

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/tx7do/go-utils/ddl_parser"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/ai"
@@ -21,12 +22,40 @@ import (
 type App struct {
 	ctx context.Context
 
+	// stateMu 保护 projectInfo/dbConfig:Wails 绑定调用各自在独立
+	// goroutine 中执行,并发读写存在数据竞争。指针只在锁内整体替换,
+	// 指向的结构体发布后不再修改。
+	stateMu    sync.Mutex
 	projectInfo *detect.ProjectInfo
 	dbConfig    *database.DBConfig
 
 	projectDetector *detect.ProjectDetector
 	generator       *generator.Generator
 	aiService       *ai.Service
+}
+
+func (a *App) setProjectInfo(pi *detect.ProjectInfo) {
+	a.stateMu.Lock()
+	a.projectInfo = pi
+	a.stateMu.Unlock()
+}
+
+func (a *App) getProjectInfo() *detect.ProjectInfo {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	return a.projectInfo
+}
+
+func (a *App) setDBConfig(cfg *database.DBConfig) {
+	a.stateMu.Lock()
+	a.dbConfig = cfg
+	a.stateMu.Unlock()
+}
+
+func (a *App) getDBConfig() *database.DBConfig {
+	a.stateMu.Lock()
+	defer a.stateMu.Unlock()
+	return a.dbConfig
 }
 
 // NewApp creates a new App application struct
@@ -66,7 +95,7 @@ func (a *App) OpenProject(projectPath string) *detect.ProjectInfo {
 	if err != nil {
 		return nil
 	}
-	a.projectInfo = pi
+	a.setProjectInfo(pi)
 
 	runtime.EventsEmit(a.ctx, "project-opened", pi)
 
@@ -75,7 +104,7 @@ func (a *App) OpenProject(projectPath string) *detect.ProjectInfo {
 
 // GetProjectInfo 返回当前打开的项目的信息。
 func (a *App) GetProjectInfo() *detect.ProjectInfo {
-	return a.projectInfo
+	return a.getProjectInfo()
 }
 
 // SelectFolder 打开文件夹选择对话框，返回用户选择的文件夹路径。
@@ -151,11 +180,11 @@ func (a *App) ImportSqlTables(sqlContent string) string {
 	}
 
 	// 设置数据库配置，使用 SQL 内容作为数据源
-	a.dbConfig = &database.DBConfig{
+	a.setDBConfig(&database.DBConfig{
 		Type:       "mysql",
 		UseDSN:     false,
 		SQLContent: sqlContent,
-	}
+	})
 
 	a.generator.CleanOptions()
 	for _, tableName := range tableNames {
@@ -202,17 +231,17 @@ func (a *App) ImportDatabaseTables(cfg database.DBConfig) string {
 
 // SetDBConfig 设置数据库连接配置
 func (a *App) SetDBConfig(cfg database.DBConfig) {
-	a.dbConfig = &cfg
+	a.setDBConfig(&cfg)
 }
 
 // GetDBConfig 获取数据库连接配置
 func (a *App) GetDBConfig() *database.DBConfig {
-	return a.dbConfig
+	return a.getDBConfig()
 }
 
 func (a *App) CleanConfig() {
-	a.projectInfo = nil
-	a.dbConfig = nil
+	a.setProjectInfo(nil)
+	a.setDBConfig(nil)
 	a.generator.CleanOptions()
 
 	runtime.EventsEmit(a.ctx, "config-cleaned")
@@ -225,12 +254,14 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) stri
 		return "ORM 类型不能为空"
 	}
 
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		runtime.LogErrorf(a.ctx, "未打开项目，无法生成代码")
 		return "未打开项目，无法生成代码"
 	}
 
-	if a.dbConfig == nil {
+	dbCfg := a.getDBConfig()
+	if dbCfg == nil {
 		runtime.LogErrorf(a.ctx, "未配置数据库连接，无法生成代码")
 		return "未配置数据库连接，无法生成代码"
 	}
@@ -243,11 +274,11 @@ func (a *App) GenerateGrpcCode(ormType string, protoPackageStrategy string) stri
 
 	if err := a.generator.GenerateGrpcCode(
 		a.ctx,
-		*a.dbConfig,
+		*dbCfg,
 		ormType,
 		protoPackageStrategy,
-		a.projectInfo.Root,
-		a.projectInfo.ModPath,
+		pi.Root,
+		pi.ModPath,
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "生成代码失败: %v", err)
 		return fmt.Sprintf("生成代码失败: %v", err)
@@ -265,12 +296,14 @@ func (a *App) GenerateRestCode(serviceName string, protoPackageStrategy string) 
 		return "服务名称不能为空"
 	}
 
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		runtime.LogErrorf(a.ctx, "未打开项目，无法生成代码")
 		return "未打开项目，无法生成代码"
 	}
 
-	if a.dbConfig == nil {
+	dbCfg := a.getDBConfig()
+	if dbCfg == nil {
 		runtime.LogErrorf(a.ctx, "未配置数据库连接，无法生成代码")
 		return "未配置数据库连接，无法生成代码"
 	}
@@ -286,9 +319,9 @@ func (a *App) GenerateRestCode(serviceName string, protoPackageStrategy string) 
 		serviceName,
 		"", // REST服务不生成ORM代码
 		protoPackageStrategy,
-		*a.dbConfig,
-		a.projectInfo.Root,
-		a.projectInfo.ModPath,
+		*dbCfg,
+		pi.Root,
+		pi.ModPath,
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "生成代码失败: %v", err)
 		return fmt.Sprintf("生成代码失败: %v", err)
@@ -484,7 +517,8 @@ func (a *App) AIPartitionMicroservices(ddl string) *ai.PartitionResult {
 
 // AIGenerateBackendCode AI 辅助生成后端代码
 func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.MicroservicePartition) string {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		runtime.LogErrorf(a.ctx, "未打开项目，无法生成代码")
 		return "未打开项目，无法生成代码"
 	}
@@ -495,11 +529,12 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 	}
 
 	// 设置数据库配置，使用 SQL 内容作为数据源
-	a.dbConfig = &database.DBConfig{
+	a.setDBConfig(&database.DBConfig{
 		Type:       "mysql",
 		UseDSN:     false,
 		SQLContent: ddl,
-	}
+	})
+	dbCfg := a.getDBConfig()
 
 	// 清空并设置生成器选项
 	a.generator.CleanOptions()
@@ -516,11 +551,11 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 	// 生成 gRPC 代码
 	if err := a.generator.GenerateGrpcCode(
 		a.ctx,
-		*a.dbConfig,
+		*dbCfg,
 		ormType,
 		"per-table", // AI 辅助生成默认使用每表独立包
-		a.projectInfo.Root,
-		a.projectInfo.ModPath,
+		pi.Root,
+		pi.ModPath,
 	); err != nil {
 		runtime.LogErrorf(a.ctx, "AI 辅助生成后端代码失败: %v", err)
 		return fmt.Sprintf("生成后端代码失败: %v", err)
@@ -532,12 +567,13 @@ func (a *App) AIGenerateBackendCode(ddl string, ormType string, partitions []ai.
 
 // AIFindOpenAPIFiles 在项目中查找 OpenAPI 文件
 func (a *App) AIFindOpenAPIFiles() *ai.OpenAPIResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		runtime.LogErrorf(a.ctx, "未打开项目")
 		return &ai.OpenAPIResult{Success: false, Error: "未打开项目"}
 	}
 
-	files, err := ai.FindOpenAPIFiles(a.projectInfo.Root)
+	files, err := ai.FindOpenAPIFiles(pi.Root)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "查找 OpenAPI 文件失败: %v", err)
 		return &ai.OpenAPIResult{Success: false, Error: err.Error()}
@@ -598,15 +634,17 @@ func (a *App) GetRemoteConfigTypes() []map[string]string {
 
 // GetConfigServices 获取项目中的服务配置信息
 func (a *App) GetConfigServices() ([]ce.ServiceInfo, error) {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return nil, fmt.Errorf("未打开项目")
 	}
-	return ce.GetServiceList(a.projectInfo.Root)
+	return ce.GetServiceList(pi.Root)
 }
 
 // ExportConfigToRemote 导出所有服务配置到远程配置中心
 func (a *App) ExportConfigToRemote(cfg ce.RemoteConfig) *ce.ExportResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		runtime.LogErrorf(a.ctx, "未打开项目")
 		return &ce.ExportResult{Success: false, Error: "未打开项目"}
 	}
@@ -616,7 +654,7 @@ func (a *App) ExportConfigToRemote(cfg ce.RemoteConfig) *ce.ExportResult {
 		return &ce.ExportResult{Success: false, Error: errMsg}
 	}
 
-	err := ce.ExportAll(&cfg, a.projectInfo.Root)
+	err := ce.ExportAll(&cfg, pi.Root)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "导出配置失败: %v", err)
 		return &ce.ExportResult{Success: false, Error: err.Error()}
@@ -630,10 +668,11 @@ func (a *App) ExportConfigToRemote(cfg ce.RemoteConfig) *ce.ExportResult {
 
 // GetDevServices 获取项目中的服务列表（详细信息）
 func (a *App) GetDevServices() ([]devtools.ServiceInfo, error) {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return nil, fmt.Errorf("未打开项目")
 	}
-	return devtools.GetServices(a.projectInfo.Root)
+	return devtools.GetServices(pi.Root)
 }
 
 // CreateProject 创建新项目
@@ -643,63 +682,70 @@ func (a *App) CreateProject(opts devtools.CreateProjectOptions) *devtools.Comman
 
 // AddService 向已有项目添加新服务
 func (a *App) AddService(opts devtools.AddServiceOptions) *devtools.CommandResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
 	}
-	return devtools.AddService(a.projectInfo.Root, opts)
+	return devtools.AddService(pi.Root, opts)
 }
 
 // ==================== 开发工具相关方法 ====================
 
 // DevRunService 运行指定服务（在终端窗口中运行）
 func (a *App) DevRunService(serviceName string) *devtools.CommandResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
 	}
-	return devtools.RunServiceInTerminal(a.projectInfo.Root, serviceName)
+	return devtools.RunServiceInTerminal(pi.Root, serviceName)
 }
 
 // DevBufGenerate 运行 buf generate
 func (a *App) DevBufGenerate() *devtools.CommandResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
 	}
-	return devtools.RunBufGenerate(a.projectInfo.Root)
+	return devtools.RunBufGenerate(pi.Root)
 }
 
 // DevEntGenerate 运行 ent generate
 func (a *App) DevEntGenerate(serviceName string) *devtools.CommandResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
 	}
 	if serviceName == "" {
-		return devtools.RunEntGenerateAll(a.projectInfo.Root)
+		return devtools.RunEntGenerateAll(pi.Root)
 	}
-	return devtools.RunEntGenerate(a.projectInfo.Root, serviceName)
+	return devtools.RunEntGenerate(pi.Root, serviceName)
 }
 
 // DevWireGenerate 运行 wire
 func (a *App) DevWireGenerate(serviceName string) *devtools.CommandResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
 	}
 	if serviceName == "" {
-		return devtools.RunWireAll(a.projectInfo.Root)
+		return devtools.RunWireAll(pi.Root)
 	}
-	return devtools.RunWire(a.projectInfo.Root, serviceName)
+	return devtools.RunWire(pi.Root, serviceName)
 }
 
 // DevGoModTidy 运行 go mod tidy
 func (a *App) DevGoModTidy() *devtools.CommandResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		return &devtools.CommandResult{Success: false, Error: "未打开项目"}
 	}
-	return devtools.RunGoModTidy(a.projectInfo.Root)
+	return devtools.RunGoModTidy(pi.Root)
 }
 
 // ExportOneServiceConfig 导出单个服务的配置到远程配置中心
 func (a *App) ExportOneServiceConfig(cfg ce.RemoteConfig, serviceName string) *ce.ExportResult {
-	if a.projectInfo == nil {
+	pi := a.getProjectInfo()
+	if pi == nil {
 		runtime.LogErrorf(a.ctx, "未打开项目")
 		return &ce.ExportResult{Success: false, Error: "未打开项目"}
 	}
@@ -709,7 +755,7 @@ func (a *App) ExportOneServiceConfig(cfg ce.RemoteConfig, serviceName string) *c
 		return &ce.ExportResult{Success: false, Error: errMsg}
 	}
 
-	err := ce.ExportOne(&cfg, a.projectInfo.Root, serviceName)
+	err := ce.ExportOne(&cfg, pi.Root, serviceName)
 	if err != nil {
 		runtime.LogErrorf(a.ctx, "导出服务 %s 配置失败: %v", serviceName, err)
 		return &ce.ExportResult{Success: false, Error: err.Error(), Service: serviceName}

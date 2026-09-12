@@ -127,37 +127,6 @@ func TestConnect_UnsupportedType(t *testing.T) {
 	t.Logf("✓ 正确处理不支持的数据库类型: %s", dbErr.Error())
 }
 
-func TestGenerateConnKey(t *testing.T) {
-	// 测试使用自定义 DSN 时的连接键生成
-	cfg1 := DBConfig{
-		Type:     DbTypeMySQL,
-		UseDSN:   true,
-		Host:     "localhost",
-		Port:     3306,
-		Database: "test",
-		Username: "root",
-	}
-	key1 := generateConnKey(cfg1)
-	if key1 != "mysql://custom-dsn" {
-		t.Errorf("期望 'mysql://custom-dsn'，但得到 '%s'", key1)
-	}
-	t.Logf("✓ UseDSN=true 时的连接键: %s", key1)
-
-	// 测试使用配置字段时的连接键生成
-	cfg2 := DBConfig{
-		Type:     DbTypePostgreSQL,
-		UseDSN:   false,
-		Host:     "localhost",
-		Port:     5432,
-		Database: "testdb",
-		Username: "admin",
-	}
-	key2 := generateConnKey(cfg2)
-	if key2 != "postgresql://admin@localhost:5432/testdb" {
-		t.Errorf("期望 'postgresql://admin@localhost:5432/testdb'，但得到 '%s'", key2)
-	}
-	t.Logf("✓ UseDSN=false 时的连接键: %s", key2)
-}
 
 func TestBuildDSN_MySQL(t *testing.T) {
 	cfg := DBConfig{

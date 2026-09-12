@@ -19,6 +19,9 @@ type CommandResult struct {
 	Success bool   `json:"success"`
 	Output  string `json:"output"`
 	Error   string `json:"error,omitempty"`
+	// Dir 仅 CreateProject 成功时填写:新建项目的实际绝对路径,
+	// 供前端直接 OpenProject,避免在前端拼接路径分隔符。
+	Dir string `json:"dir,omitempty"`
 }
 
 // ServiceInfo 服务信息
@@ -333,7 +336,7 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 	}
 
 	allOutput.WriteString(fmt.Sprintf("项目 %s 创建成功!\n", projectDir))
-	return &CommandResult{Success: true, Output: allOutput.String()}
+	return &CommandResult{Success: true, Output: allOutput.String(), Dir: projectDir}
 }
 
 // AddService 向已有项目添加新服务

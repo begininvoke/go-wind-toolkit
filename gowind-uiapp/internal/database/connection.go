@@ -20,11 +20,6 @@ type DBConnection struct {
 	config DBConfig
 }
 
-var (
-	// 全局连接池（生产环境建议使用连接池管理器）
-	connections = make(map[string]*DBConnection)
-)
-
 // Connect 建立数据库连接（带超时控制）
 func Connect(cfg DBConfig) (*DBConnection, error) {
 	// 设置超时时间
@@ -35,19 +30,6 @@ func Connect(cfg DBConfig) (*DBConnection, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
-
-	// 生成连接键（用于连接复用）
-	connKey := generateConnKey(cfg)
-
-	// 检查是否已有有效连接
-	if conn, exists := connections[connKey]; exists {
-		if err := conn.Ping(ctx); err == nil {
-			return conn, nil
-		}
-		// 连接失效，关闭并重建
-		conn.Close()
-		delete(connections, connKey)
-	}
 
 	// 构建 DSN
 	dsn := cfg.DSN // 默认使用配置中的 DSN
@@ -83,7 +65,7 @@ func Connect(cfg DBConfig) (*DBConnection, error) {
 	case DbTypeSQLite:
 		db, err = sql.Open("sqlite", dsn)
 	case DbTypeOracle:
-		db, err = sql.Open("godror", dsn)
+		db, err = sql.Open("oracle", dsn)
 	default:
 		return nil, &DBError{
 			Code:    "UNSUPPORTED_DB",
@@ -115,7 +97,6 @@ func Connect(cfg DBConfig) (*DBConnection, error) {
 		db:     db,
 		config: cfg,
 	}
-	connections[connKey] = conn
 
 	return conn, nil
 }
@@ -140,17 +121,6 @@ func (conn *DBConnection) Exec(ctx context.Context, sql string, args ...any) (sq
 // Query 执行查询（SELECT）
 func (conn *DBConnection) Query(ctx context.Context, sql string, args ...any) (*sql.Rows, error) {
 	return conn.db.QueryContext(ctx, sql, args...)
-}
-
-// 构建 DSN（Data Source Name）
-func generateConnKey(cfg DBConfig) string {
-	// 如果使用自定义 DSN，以 DSN 作为键
-	if cfg.UseDSN {
-		return fmt.Sprintf("%s://custom-dsn", cfg.Type)
-	}
-	// 否则基于配置字段生成键
-	return fmt.Sprintf("%s://%s@%s:%d/%s",
-		cfg.Type, cfg.Username, cfg.Host, cfg.Port, cfg.Database)
 }
 
 // 构建 DSN（Data Source Name）

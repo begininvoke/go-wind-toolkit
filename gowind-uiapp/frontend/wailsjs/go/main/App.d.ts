@@ -4,6 +4,7 @@ import {ai} from '../models';
 import {devtools} from '../models';
 import {generator} from '../models';
 import {configexporter} from '../models';
+import {main} from '../models';
 import {database} from '../models';
 import {detect} from '../models';
 

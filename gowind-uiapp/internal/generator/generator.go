@@ -3,6 +3,7 @@ package generator
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/database"
 	"github.com/tx7do/go-wind-toolkit/gowind-uiapp/internal/devtools"
@@ -21,8 +22,11 @@ func (noopLogger) Infof(string, ...any)  {}
 func (noopLogger) Errorf(string, ...any) {}
 
 type Generator struct {
-	options GeneratorOptions
-	logger  Logger
+	// mu 保护 options/logger/skipPostProcess:Wails 绑定调用各自在独立
+	// goroutine 中执行,前端并发触发选项读写时存在数据竞争。
+	mu             sync.Mutex
+	options        GeneratorOptions
+	logger         Logger
 	// skipPostProcess 跳过生成后的 tidy/buf/ent/wire 后处理链
 	skipPostProcess bool
 }
@@ -39,21 +43,31 @@ func (g *Generator) SetLogger(logger Logger) {
 	if logger == nil {
 		logger = noopLogger{}
 	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.logger = logger
 }
 
 // SetSkipPostProcess 跳过 gRPC 生成后的 tidy/buf/ent/wire 后处理链
 func (g *Generator) SetSkipPostProcess(skip bool) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.skipPostProcess = skip
 }
 
-// GetOptions 获取选项
+// GetOptions 获取选项(副本)
 func (g *Generator) GetOptions() GeneratorOptions {
-	return g.options
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	out := make(GeneratorOptions, len(g.options))
+	copy(out, g.options)
+	return out
 }
 
 // SetOptions 设置选项
 func (g *Generator) SetOptions(options GeneratorOptions) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.options = options
 }
 
@@ -63,6 +77,8 @@ func (g *Generator) EditOption(o *Option) {
 		return
 	}
 
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	for i, opt := range g.options {
 		if opt.TableName == o.TableName {
 			g.options[i] = o
@@ -81,18 +97,23 @@ func (g *Generator) AddOption(o *Option) {
 		return
 	}
 
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	o.ID = uint32(len(g.options) + 1)
-
 	g.options = append(g.options, o)
 }
 
 // CleanOptions 清空所有选项
 func (g *Generator) CleanOptions() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	g.options = GeneratorOptions{}
 }
 
 // ValidateOptions 验证选项的有效性，返回错误信息字符串，如果没有错误则返回空字符串
 func (g *Generator) ValidateOptions() string {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	if len(g.options) == 0 {
 		return "no tables selected"
 	}
@@ -109,8 +130,10 @@ func (g *Generator) ValidateOptions() string {
 	return ""
 }
 
-// GetValidateOptions 获取通过验证的选项列表
+// GetValidateOptions 获取通过验证的选项列表(副本)
 func (g *Generator) GetValidateOptions() GeneratorOptions {
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	var options GeneratorOptions
 	for _, opt := range g.options {
 		if opt.TableName != "" &&

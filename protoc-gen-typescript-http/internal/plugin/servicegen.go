@@ -273,7 +273,18 @@ func generateMethodBody(
 	case rule.Body == "":
 		f.P(t(3), "const body = null;")
 	case rule.Body == "*":
-		f.P(t(3), "const body = JSON.stringify(request);")
+		if pathVars := pathVariableJSONNames(rule); len(pathVars) > 0 {
+			// Path-bound fields must not be duplicated in the body: the server
+			// binds them from the URL path, and a field arriving from both
+			// sources conflicts on its (synthetic) oneof.
+			f.P(t(3), "const bodyMap = { ...request } as Record<string, unknown>;")
+			for _, fp := range pathVars {
+				tsBodyStripStmts(f, jsonPathSegments(fp, input))
+			}
+			f.P(t(3), "const body = JSON.stringify(bodyMap);")
+		} else {
+			f.P(t(3), "const body = JSON.stringify(request);")
+		}
 	default:
 		bodyField := input.Fields().ByName(protoreflect.Name(rule.Body))
 		if bodyField == nil {
@@ -284,6 +295,39 @@ func generateMethodBody(
 		nullPath := nullPropagationPath(httprule.FieldPath{rule.Body}, input)
 		f.P(t(3), "const body = JSON.stringify(request?.", nullPath, " ?? {});")
 	}
+}
+
+// pathVariableJSONNames returns the JSON name path of every field bound by
+// the path template, for exclusion from the request body. The input message
+// descriptor is only needed to resolve names; unknown fields fall back to
+// their proto names (the emitted removal then degrades to a no-op).
+func pathVariableJSONNames(rule httprule.Rule) [][]string {
+	var paths [][]string
+	seen := make(map[string]struct{})
+	for _, seg := range rule.Template.Segments {
+		if seg.Kind != httprule.SegmentKindVariable {
+			continue
+		}
+		key := seg.Variable.FieldPath.String()
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		paths = append(paths, seg.Variable.FieldPath)
+	}
+	return paths
+}
+
+// tsBodyStripStmts emits TS statements removing a (possibly nested) key from
+// the shallow-copied body map. Intermediate levels are re-copied first so the
+// delete never mutates the caller's request object.
+func tsBodyStripStmts(f *codegen.File, namePath []string) {
+	for i := 1; i < len(namePath); i++ {
+		prefix := strings.Join(namePath[:i], `"]["`)
+		f.P(t(3), `bodyMap["`+prefix+`"] = { ...bodyMap["`+prefix+`"] };`)
+	}
+	full := strings.Join(namePath, `"]["`)
+	f.P(t(3), `delete bodyMap["`+full+`"];`)
 }
 
 // methodUsesRequest returns true if the generated method body will reference
@@ -313,6 +357,9 @@ func hasQueryParams(input protoreflect.MessageDescriptor, rule httprule.Rule) bo
 		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
 			return
 		}
+		if isMessageCollectionField(field) {
+			return
+		}
 		found = true
 	})
 	return found
@@ -336,6 +383,9 @@ func generateMethodQuery(
 	f.P(t(3), "const queryParams: string[] = [];")
 	walkJSONLeafFields(input, func(path httprule.FieldPath, field protoreflect.FieldDescriptor) {
 		if len(path) == 0 || isPathCovered(path, pathCovered) || isBodyField(path, rule) {
+			return
+		}
+		if isMessageCollectionField(field) {
 			return
 		}
 		nullPath := nullPropagationPath(path, input)
@@ -371,6 +421,19 @@ func isPathCovered(path httprule.FieldPath, covered map[string]struct{}) bool {
 
 func isBodyField(path httprule.FieldPath, rule httprule.Rule) bool {
 	return rule.Body != "" && path[0] == rule.Body
+}
+
+// isMessageCollectionField returns true if the field is a repeated or map field
+// whose element/value type is a message. Such fields cannot be meaningfully
+// serialized as query parameters.
+func isMessageCollectionField(field protoreflect.FieldDescriptor) bool {
+	if field.IsList() && field.Kind() == protoreflect.MessageKind {
+		return true
+	}
+	if field.IsMap() && field.MapValue().Kind() == protoreflect.MessageKind {
+		return true
+	}
+	return false
 }
 
 // supportedMethod returns whether a method is supported by this generator,

@@ -342,7 +342,7 @@ export function createSyntaxServiceClient(
 ): SyntaxService {
   return {
     QueryOnly(request) {
-      const path = `v1`;
+      const path = `/v1`;
       const body = null;
       const queryParams: string[] = [];
       if (request.string) {
@@ -372,7 +372,7 @@ export function createSyntaxServiceClient(
       }) as Promise<Message>;
     },
     EmptyVerb(_request) {
-      const path = `v1:emptyVerb`;
+      const path = `/v1:emptyVerb`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'SyntaxService',
@@ -380,7 +380,7 @@ export function createSyntaxServiceClient(
       }) as Promise<wellKnownEmpty>;
     },
     StarBody(request) {
-      const path = `v1:starBody`;
+      const path = `/v1:starBody`;
       const body = JSON.stringify(request);
       return transport.unary(path, 'POST', body, {
         service: 'SyntaxService',
@@ -388,7 +388,7 @@ export function createSyntaxServiceClient(
       }) as Promise<Message>;
     },
     Body(request) {
-      const path = `v1:body`;
+      const path = `/v1:body`;
       const body = JSON.stringify(request?.nested ?? {});
       const queryParams: string[] = [];
       if (request.string) {
@@ -416,7 +416,7 @@ export function createSyntaxServiceClient(
       if (request.string === undefined || request.string === null) {
         throw new Error('missing required field request.string');
       }
-      const path = `v1/${request.string}:path`;
+      const path = `/v1/${request.string}:path`;
       const body = null;
       const queryParams: string[] = [];
       if (request.repeatedString) {
@@ -444,7 +444,7 @@ export function createSyntaxServiceClient(
       if (request.string === undefined || request.string === null) {
         throw new Error('missing required field request.string');
       }
-      const path = `v1/${request.string}:pathBody`;
+      const path = `/v1/${request.string}:pathBody`;
       const body = JSON.stringify(request?.nested ?? {});
       const queryParams: string[] = [];
       if (request.repeatedString) {

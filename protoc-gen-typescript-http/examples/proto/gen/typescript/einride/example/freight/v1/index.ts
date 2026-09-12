@@ -494,7 +494,7 @@ export function createFreightServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}`;
+      const path = `/v1/${request.name}`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'FreightService',
@@ -502,7 +502,7 @@ export function createFreightServiceClient(
       }) as Promise<Shipper>;
     },
     ListShippers(request) {
-      const path = `v1/shippers`;
+      const path = `/v1/shippers`;
       const body = null;
       const queryParams: string[] = [];
       if (request.pageSize) {
@@ -525,7 +525,7 @@ export function createFreightServiceClient(
       }) as Promise<ListShippersResponse>;
     },
     CreateShipper(request) {
-      const path = `v1/shippers`;
+      const path = `/v1/shippers`;
       const body = JSON.stringify(request?.shipper ?? {});
       return transport.unary(path, 'POST', body, {
         service: 'FreightService',
@@ -536,7 +536,7 @@ export function createFreightServiceClient(
       if (request.shipper?.name === undefined || request.shipper?.name === null) {
         throw new Error('missing required field request.shipper.name');
       }
-      const path = `v1/${request.shipper.name}`;
+      const path = `/v1/${request.shipper.name}`;
       const body = JSON.stringify(request?.shipper ?? {});
       const queryParams: string[] = [];
       if (request.updateMask) {
@@ -557,7 +557,7 @@ export function createFreightServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}`;
+      const path = `/v1/${request.name}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'FreightService',
@@ -568,7 +568,7 @@ export function createFreightServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}`;
+      const path = `/v1/${request.name}`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'FreightService',
@@ -579,7 +579,7 @@ export function createFreightServiceClient(
       if (request.parent === undefined || request.parent === null) {
         throw new Error('missing required field request.parent');
       }
-      const path = `v1/${request.parent}/sites`;
+      const path = `/v1/${request.parent}/sites`;
       const body = null;
       const queryParams: string[] = [];
       if (request.pageSize) {
@@ -605,7 +605,7 @@ export function createFreightServiceClient(
       if (request.parent === undefined || request.parent === null) {
         throw new Error('missing required field request.parent');
       }
-      const path = `v1/${request.parent}/sites`;
+      const path = `/v1/${request.parent}/sites`;
       const body = JSON.stringify(request?.site ?? {});
       return transport.unary(path, 'POST', body, {
         service: 'FreightService',
@@ -616,7 +616,7 @@ export function createFreightServiceClient(
       if (request.site?.name === undefined || request.site?.name === null) {
         throw new Error('missing required field request.site.name');
       }
-      const path = `v1/${request.site.name}`;
+      const path = `/v1/${request.site.name}`;
       const body = JSON.stringify(request?.site ?? {});
       const queryParams: string[] = [];
       if (request.updateMask) {
@@ -637,7 +637,7 @@ export function createFreightServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}`;
+      const path = `/v1/${request.name}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'FreightService',
@@ -648,7 +648,7 @@ export function createFreightServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}`;
+      const path = `/v1/${request.name}`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'FreightService',
@@ -659,7 +659,7 @@ export function createFreightServiceClient(
       if (request.parent === undefined || request.parent === null) {
         throw new Error('missing required field request.parent');
       }
-      const path = `v1/${request.parent}/shipments`;
+      const path = `/v1/${request.parent}/shipments`;
       const body = null;
       const queryParams: string[] = [];
       if (request.pageSize) {
@@ -685,7 +685,7 @@ export function createFreightServiceClient(
       if (request.parent === undefined || request.parent === null) {
         throw new Error('missing required field request.parent');
       }
-      const path = `v1/${request.parent}/shipments`;
+      const path = `/v1/${request.parent}/shipments`;
       const body = JSON.stringify(request?.shipment ?? {});
       return transport.unary(path, 'POST', body, {
         service: 'FreightService',
@@ -696,7 +696,7 @@ export function createFreightServiceClient(
       if (request.shipment?.name === undefined || request.shipment?.name === null) {
         throw new Error('missing required field request.shipment.name');
       }
-      const path = `v1/${request.shipment.name}`;
+      const path = `/v1/${request.shipment.name}`;
       const body = JSON.stringify(request?.shipment ?? {});
       const queryParams: string[] = [];
       if (request.updateMask) {
@@ -717,7 +717,7 @@ export function createFreightServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}`;
+      const path = `/v1/${request.name}`;
       const body = null;
       return transport.unary(path, 'DELETE', body, {
         service: 'FreightService',

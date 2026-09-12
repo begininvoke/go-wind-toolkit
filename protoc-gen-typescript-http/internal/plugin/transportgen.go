@@ -159,7 +159,7 @@ func literalPath(rule httprule.Rule) string {
 			parts = append(parts, "**")
 		}
 	}
-	path := strings.Join(parts, "/")
+	path := "/" + strings.Join(parts, "/")
 	if rule.Template.Verb != "" {
 		path += ":" + rule.Template.Verb
 	}

@@ -135,7 +135,7 @@ export function createStreamServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}`;
+      const path = `/v1/${request.name}`;
       const body = null;
       return transport.unary(path, 'GET', body, {
         service: 'StreamService',
@@ -143,7 +143,7 @@ export function createStreamServiceClient(
       }) as Promise<LogEntry>;
     },
     ListLogs(request) {
-      const path = `v1/logs`;
+      const path = `/v1/logs`;
       const body = null;
       const queryParams: string[] = [];
       if (request.pageSize) {
@@ -169,7 +169,7 @@ export function createStreamServiceClient(
       if (request.name === undefined || request.name === null) {
         throw new Error('missing required field request.name');
       }
-      const path = `v1/${request.name}:tail`;
+      const path = `/v1/${request.name}:tail`;
       const queryParams: string[] = [];
       if (request.filter) {
         queryParams.push(
@@ -186,7 +186,7 @@ export function createStreamServiceClient(
       });
     },
     Chat() {
-      const path = 'v1/chat';
+      const path = '/v1/chat';
       return transport.duplexStream(path, {
         service: 'StreamService',
         method: 'Chat',

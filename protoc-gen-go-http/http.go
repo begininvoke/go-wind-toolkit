@@ -92,8 +92,11 @@ func genService(_ *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFi
 	}
 	for _, method := range service.Methods {
 		if method.Desc.IsStreamingClient() || method.Desc.IsStreamingServer() {
-			_, _ = fmt.Fprintf(os.Stderr, "\u001B[33mWARN\u001B[m: skipping streaming method %s (use WebSocket/SSE server directly)\n", method.GoName)
-			continue
+			if !isHttpBodyStreamMethod(method) {
+				_, _ = fmt.Fprintf(os.Stderr, "\u001B[33mWARN\u001B[m: skipping streaming method %s (only google.api.HttpBody streams are generated over HTTP; other element types need SSE/WebSocket transports)\n", method.GoName)
+				continue
+			}
+			// HttpBody 流式方法继续走注解处理，handler 按流式形态生成。
 		}
 		rule, ok := proto.GetExtension(method.Desc.Options(), annotations.E_Http).(*annotations.HttpRule)
 		if rule != nil && ok {
@@ -179,7 +182,14 @@ func buildHTTPRule(g *protogen.GeneratedFile, service *protogen.Service, m *prot
 			}
 		}
 	}
-	if body == "*" {
+	if m.Desc.IsStreamingClient() {
+		// 客户端流式：请求体就是字节流本身，不经 proto 绑定；注解里的
+		// body 声明对流式语义无意义，忽略并提示。
+		if body != "" {
+			_, _ = fmt.Fprintf(os.Stderr, "\u001B[33mWARN\u001B[m: %s %s body declaration ignored for client-streaming method; the request body is the byte stream itself.\n", method, path)
+		}
+		md.HasBody = false
+	} else if body == "*" {
 		md.HasBody = true
 		md.Body = ""
 		md.BodyField = "*"
@@ -275,6 +285,7 @@ func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path
 		Num:             methodSets[m.GoName],
 		Request:         g.QualifiedGoIdent(m.Input.GoIdent),
 		Reply:           g.QualifiedGoIdent(m.Output.GoIdent),
+		StreamElem:      streamElemGoIdent(g, m),
 		Comment:         comment,
 		Path:            path,
 		PathTemplate:    pathTemplate,
@@ -285,6 +296,30 @@ func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path
 		ClientStreaming: m.Desc.IsStreamingClient(),
 		ServerStreaming: m.Desc.IsStreamingServer(),
 	}
+}
+
+// isHttpBodyStreamMethod 判定流式方法是否为 HttpBody 流——HTTP 绑定唯一
+// 生成的流式形态（下行分块写 + 上行请求体直传）。其他流式元素类型仍被跳过。
+func isHttpBodyStreamMethod(m *protogen.Method) bool {
+	if m.Desc.IsStreamingClient() && isHTTPBodyMessage(m.Input.Desc) {
+		return true
+	}
+	if m.Desc.IsStreamingServer() && isHTTPBodyMessage(m.Output.Desc) {
+		return true
+	}
+	return false
+}
+
+// streamElemGoIdent 返回 HttpBody 流式方法的流式元素限定 Go 类型名；
+// 普通方法返回空串。
+func streamElemGoIdent(g *protogen.GeneratedFile, m *protogen.Method) string {
+	if m.Desc.IsStreamingClient() && isHTTPBodyMessage(m.Input.Desc) {
+		return g.QualifiedGoIdent(m.Input.GoIdent)
+	}
+	if m.Desc.IsStreamingServer() && isHTTPBodyMessage(m.Output.Desc) {
+		return g.QualifiedGoIdent(m.Output.GoIdent)
+	}
+	return ""
 }
 
 func isHTTPBodyField(fd protoreflect.FieldDescriptor) bool {

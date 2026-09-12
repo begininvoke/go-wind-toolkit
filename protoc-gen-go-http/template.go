@@ -66,6 +66,7 @@ type methodDesc struct {
 	BodyQueryName   string // 请求体字段的 JSON 名，用于查询参数绑定。 / JSON name of the body field, used for query binding. / リクエストボディフィールドの JSON 名。クエリバインディングに使用。
 	BodyHTTPBody    bool   // 请求体是否为 google.api.HttpBody 类型。 / Whether the request body is a google.api.HttpBody. / リクエストボディが google.api.HttpBody 型かどうか。
 	BodyMessage     bool   // 请求体字段是否为单个消息类型（可用于流式分帧）。 / Whether the body field is a singular message type (usable for streaming framing). / リクエストボディフィールドが単一メッセージ型かどうか（ストリーミングフレーム化に使用可）。
+	StreamElem      string // 流式元素类型的限定 Go 名（google.api.HttpBody 流式方法专用；普通方法为空）。 / Qualified Go name of the stream element type (HttpBody-streaming methods only; empty otherwise). / ストリーム要素型の修飾 Go 名（HttpBody ストリーミングメソッド専用。それ以外は空）。
 	ResponseBody    string // 响应体字段访问器，例如 ".Body"，为空表示返回整个响应。 / Response body field accessor, e.g. ".Body"; empty means return the whole response. / レスポンスボディのフィールドアクセサ（例: ".Body"）。空はレスポンス全体を返す。
 	ReplyHTTPBody   bool   // 响应消息是否为 google.api.HttpBody 类型。 / Whether the reply message is a google.api.HttpBody. / レスポンスメッセージが google.api.HttpBody 型かどうか。
 	ClientStreaming bool   // 方法是否为客户端流式。 / Whether the method is client-streaming. / メソッドがクライアントストリーミングかどうか。

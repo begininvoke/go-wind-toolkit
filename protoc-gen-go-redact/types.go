@@ -1,5 +1,12 @@
 package main
 
+// EnvCheck 一层条件守卫的 env 变量名与期望值,均为经 strconv.Quote
+// 转义的 Go 字符串字面量。
+type EnvCheck struct {
+	Var string
+	Val string
+}
+
 // ProtoFileData defines custom data type for Proto File info needed in template
 type ProtoFileData struct {
 	Source  string
@@ -180,9 +187,11 @@ type FieldData struct {
 	CustomFuncName string // registered redactor name, already quoted
 
 	// --- Condition-based redaction fields ---
+
+	// IsCondition 为 true 表示该字段存在条件守卫。
 	IsCondition bool
-	// CondEnvVar is the Go string literal for the env var name
-	CondEnvVar string // already quoted via strconv.Quote
-	// CondEnvVal is the Go string literal for the expected env var value
-	CondEnvVal string // already quoted via strconv.Quote
+	// CondEnvChecks 沿嵌套链收集的全部条件守卫。条件规则可以嵌套包裹
+	// 任意其他规则;每层条件都须满足,守卫才放行,因此生成端把整条
+	// 祖先链的检查以逻辑与连接,而不是只保留最内层。
+	CondEnvChecks []EnvCheck
 }

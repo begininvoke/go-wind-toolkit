@@ -406,7 +406,8 @@ func (m *Module) processService(
 		methErrMsg = strings.ReplaceAll(methErrMsg, specifierMethod, methData.Name)
 		methErrMsg = strings.ReplaceAll(methErrMsg, specifierService, srvData.Name)
 
-		methData.ErrMessage = "`" + methErrMsg + "`"
+		// 解释型字符串字面量,值中的特殊字符一律转义,防止注入。
+		methData.ErrMessage = strconv.Quote(methErrMsg)
 		methData.StatusCode = codes.Code(methCode).String()
 		methData.Internal = srvInternal || methInternal
 	}

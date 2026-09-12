@@ -332,8 +332,10 @@ func (m *Module) redactedCustomValue(
 			m.Failf("Invalid condition rule for field %s", field.Name())
 			return
 		}
-		flData.CondEnvVar = strconv.Quote(cr.Condition.GetEnvVar())
-		flData.CondEnvVal = strconv.Quote(cr.Condition.GetEnvVal())
+		flData.CondEnvChecks = append(flData.CondEnvChecks, EnvCheck{
+			Var: strconv.Quote(cr.Condition.GetEnvVar()),
+			Val: strconv.Quote(cr.Condition.GetEnvVal()),
+		})
 		// Recursively process the inner rules
 		innerRules := cr.Condition.GetRules()
 		if innerRules != nil && innerRules.Values != nil {
@@ -565,8 +567,10 @@ func (m *Module) redactedCustomValue(
 				m.Failf("Invalid condition rule for field %s", field.Name())
 				return
 			}
-			flData.CondEnvVar = strconv.Quote(cond.GetEnvVar())
-			flData.CondEnvVal = strconv.Quote(cond.GetEnvVal())
+			flData.CondEnvChecks = append(flData.CondEnvChecks, EnvCheck{
+				Var: strconv.Quote(cond.GetEnvVar()),
+				Val: strconv.Quote(cond.GetEnvVal()),
+			})
 			// Recursively process the inner rules for the item
 			innerRules := cond.GetRules()
 			if innerRules != nil && innerRules.Values != nil {
@@ -691,10 +695,12 @@ func (m *Module) RuleInformation(rules *redact.FieldRules) (res RuleInfo) {
 		res.RedactionValue = rule.Bool
 	case *redact.FieldRules_String_:
 		res.ProtoType = pgs.StringT
-		res.RedactionValue = fmt.Sprintf("`%v`", rule.String_)
+		// 解释型字符串字面量:值中的反引号/引号等一律转义,防止把
+		// 任意内容注入进生成的 Go 源码。
+		res.RedactionValue = strconv.Quote(rule.String_)
 	case *redact.FieldRules_Bytes:
 		res.ProtoType = pgs.BytesT
-		res.RedactionValue = fmt.Sprintf("[]byte(`%v`)", string(rule.Bytes))
+		res.RedactionValue = "[]byte(" + strconv.Quote(string(rule.Bytes)) + ")"
 	case *redact.FieldRules_Enum:
 		res.ProtoType = pgs.EnumT
 		res.RedactionValue = rule.Enum

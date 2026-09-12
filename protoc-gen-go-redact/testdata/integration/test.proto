@@ -85,6 +85,14 @@ message TestMessage {
 
   // Condition-based redaction
   string cond_phone = 34 [(redact.value).condition = { env_var: "APP_ENV" env_val: "production" rules: { mask: { keep_first: 3 keep_last: 4 } } }];
+
+  // Nested conditions: every level of the chain must hold, so the generated
+  // guard is the conjunction of both env checks (not just the inner one).
+  string nested_cond_phone = 35 [(redact.value).condition = { env_var: "OUTER_ENV" env_val: "outer" rules: { condition: { env_var: "INNER_ENV" env_val: "inner" rules: { mask: { keep_first: 2 keep_last: 2 } } } } }];
+
+  // String value containing a double quote and a backtick: the generated
+  // literal must escape them instead of injecting raw source code.
+  string quoted_value = 36 [(redact.value).string = "pre\"post`tick"];
 }
 
 // Profile message with its own redaction rules

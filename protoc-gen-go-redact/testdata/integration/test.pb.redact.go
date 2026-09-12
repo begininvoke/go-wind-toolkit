@@ -165,7 +165,7 @@ func (s *redactedTestServiceServer) AdminOperation(ctx context.Context, in *GetU
 	if s.bypass.CheckInternal(ctx) {
 		return s.srv.AdminOperation(ctx, in)
 	}
-	return nil, status.Error(codes.PermissionDenied, `Permission Denied. Method: "TestServiceServer.AdminOperation" has been redacted`)
+	return nil, status.Error(codes.PermissionDenied, "Permission Denied. Method: \"TestServiceServer.AdminOperation\" has been redacted")
 }
 
 // HealthCheck is the redacted wrapper for the actual TestServiceServer.HealthCheck method
@@ -199,10 +199,10 @@ func (x *TestMessage) Redact() {
 	// Safe field: Name
 
 	// Redacting field: Password
-	x.Password = `REDACTED`
+	x.Password = "REDACTED"
 
 	// Redacting field: Email
-	EmailTmp := `r*d@ct*d`
+	EmailTmp := "r*d@ct*d"
 	x.Email = &EmailTmp
 
 	// Redacting field: Age
@@ -214,7 +214,7 @@ func (x *TestMessage) Redact() {
 	x.IsActive = &IsActiveTmp
 
 	// Redacting field: Signature
-	x.Signature = []byte(``)
+	x.Signature = []byte("")
 
 	// Safe field: Profile
 
@@ -315,9 +315,19 @@ func (x *TestMessage) Redact() {
 	x.CustomSsn = redact.ApplyCustomRedactor("myRedactor", x.CustomSsn)
 
 	// Redacting field: CondPhone
+	// 嵌套条件守卫:整条祖先链的 env 检查须全部满足。
 	if _redactCondCheck("APP_ENV", "production") {
 		x.CondPhone = _redactMask(x.CondPhone, 3, 4, "*")
 	}
+
+	// Redacting field: NestedCondPhone
+	// 嵌套条件守卫:整条祖先链的 env 检查须全部满足。
+	if _redactCondCheck("OUTER_ENV", "outer") && _redactCondCheck("INNER_ENV", "inner") {
+		x.NestedCondPhone = _redactMask(x.NestedCondPhone, 2, 2, "*")
+	}
+
+	// Redacting field: QuotedValue
+	x.QuotedValue = "pre\"post`tick"
 }
 
 // Ensure Profile implements the Redactor interface at compile time.
@@ -332,10 +342,10 @@ func (x *Profile) Redact() {
 	// Safe field: Username
 
 	// Redacting field: Bio
-	x.Bio = `[REDACTED BIO]`
+	x.Bio = "[REDACTED BIO]"
 
 	// Redacting field: Phone
-	PhoneTmp := `XXX-XXX-XXXX`
+	PhoneTmp := "XXX-XXX-XXXX"
 	x.Phone = &PhoneTmp
 
 	// Safe field: CreatedAt
@@ -383,14 +393,14 @@ func (x *Address) Redact() {
 	}
 
 	// Redacting field: Street
-	x.Street = `REDACTED`
+	x.Street = "REDACTED"
 
 	// Safe field: City
 
 	// Safe field: Country
 
 	// Redacting field: PostalCode
-	PostalCodeTmp := `XXXXX`
+	PostalCodeTmp := "XXXXX"
 	x.PostalCode = &PostalCodeTmp
 }
 
@@ -406,7 +416,7 @@ func (x *GetUserRequest) Redact() {
 	// Safe field: UserId
 
 	// Redacting field: Token
-	TokenTmp := `[TOKEN]`
+	TokenTmp := "[TOKEN]"
 	x.Token = &TokenTmp
 }
 
@@ -475,9 +485,9 @@ func (x *OneofMessage) Redact() {
 	// Redacting oneof: Contact
 	switch v := x.Contact.(type) {
 	case *OneofMessage_Email:
-		v.Email = `r*d@ct*d`
+		v.Email = "r*d@ct*d"
 	case *OneofMessage_Phone:
-		v.Phone = `XXX-XXX-XXXX`
+		v.Phone = "XXX-XXX-XXXX"
 	case *OneofMessage_PhoneCode:
 		v.PhoneCode = 0
 	}
@@ -488,12 +498,12 @@ func (x *OneofMessage) Redact() {
 	case *OneofMessage_UserSettings:
 		v.UserSettings = nil
 	case *OneofMessage_RawData:
-		v.RawData = `REDACTED`
+		v.RawData = "REDACTED"
 	}
 	// Redacting oneof: Identifier
 	switch v := x.Identifier.(type) {
 	case *OneofMessage_Username:
-		v.Username = `REDACTED`
+		v.Username = "REDACTED"
 	case *OneofMessage_InternalId:
 		v.InternalId = 0
 	}

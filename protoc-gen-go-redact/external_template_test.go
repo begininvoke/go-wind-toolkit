@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"text/template"
 
@@ -12,51 +13,56 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestExternalTemplateLoading tests loading templates from external files
+// TestExternalTemplateLoading tests loading templates from external files.
+// 全部产物落在 t.TempDir(),不再原地覆写仓库文件;protoc 不在 PATH
+// 时跳过。
 func TestExternalTemplateLoading(t *testing.T) {
-	// Get current working directory
+	if testing.Short() {
+		t.Skip("skipping integration test in short mode")
+	}
+	if _, err := exec.LookPath("protoc"); err != nil {
+		t.Skip("protoc not found in PATH; skipping external template test")
+	}
+
 	currentDir, err := os.Getwd()
 	require.NoError(t, err)
 
-	testDir := filepath.Join(currentDir, "testdata", "integration")
-	protoFile := filepath.Join(testDir, "test.proto")
+	// 把被测插件编译进临时目录。
+	pluginPath := filepath.Join(t.TempDir(), "protoc-gen-redact")
+	if runtime.GOOS == "windows" {
+		pluginPath += ".exe"
+	}
+	buildCmd := exec.Command("go", "build", "-o", pluginPath, ".")
+	buildCmd.Env = append(os.Environ(), "GOWORK=off")
+	buildOutput, err := buildCmd.CombinedOutput()
+	require.NoError(t, err, "Should build protoc-gen-redact plugin: %s", string(buildOutput))
 
-	t.Run("use_external_template", func(t *testing.T) {
-		// Build the plugin
-		buildCmd := exec.Command("go", "build", "-o", "protoc-gen-redact", ".")
-		buildOutput, err := buildCmd.CombinedOutput()
-		if err != nil {
-			t.Logf("build output: %s", string(buildOutput))
-		}
-		require.NoError(t, err, "Should build protoc-gen-redact plugin")
+	templatePath := filepath.Join(currentDir, "examples", "custom-template.tmpl")
+	require.FileExists(t, templatePath, "Example template should exist")
 
-		pluginPath := filepath.Join(currentDir, "protoc-gen-redact")
-		require.FileExists(t, pluginPath, "Plugin binary should exist")
+	protoFile := filepath.Join(currentDir, "testdata", "integration", "test.proto")
 
-		templatePath := filepath.Join(currentDir, "examples", "custom-template.tmpl")
-		require.FileExists(t, templatePath, "Example template should exist")
-
-		// Generate code using external template
+	runProtoc := func(outDir string, templateOpt string) ([]byte, error) {
 		cmd := exec.Command("protoc",
 			"--experimental_allow_proto3_optional",
 			"--plugin=protoc-gen-redact="+pluginPath,
-			"--redact_out="+currentDir,
-			"--redact_opt=template_file="+templatePath+",paths=source_relative",
+			"--redact_out="+outDir,
+			"--redact_opt="+templateOpt+",paths=source_relative",
 			"-I="+currentDir,
 			protoFile,
 		)
+		return cmd.CombinedOutput()
+	}
 
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Logf("protoc output: %s", string(output))
-		}
-		require.NoError(t, err, "Should generate code with external template")
+	t.Run("use_external_template", func(t *testing.T) {
+		outDir := t.TempDir()
+		output, err := runProtoc(outDir, "template_file="+templatePath)
+		require.NoError(t, err, "Should generate code with external template: %s", string(output))
 
-		// Verify generated file exists
-		redactFile := filepath.Join(testDir, "test.pb.redact.go")
-		require.FileExists(t, redactFile, "Generated redaction file should exist")
+		// 产物落在临时目录里。
+		redactFile := filepath.Join(outDir, "testdata", "integration", "test.pb.redact.go")
+		require.FileExists(t, redactFile, "Generated redaction file should exist in the temp dir")
 
-		// Verify file contains expected content
 		content, err := os.ReadFile(redactFile)
 		require.NoError(t, err)
 
@@ -67,103 +73,53 @@ func TestExternalTemplateLoading(t *testing.T) {
 	})
 
 	t.Run("nonexistent_template_file", func(t *testing.T) {
-		pluginPath := filepath.Join(currentDir, "protoc-gen-redact")
-
-		// Try to use nonexistent template
-		cmd := exec.Command("protoc",
-			"--experimental_allow_proto3_optional",
-			"--plugin=protoc-gen-redact="+pluginPath,
-			"--redact_out="+currentDir,
-			"--redact_opt=template_file=/nonexistent/template.tmpl,paths=source_relative",
-			"-I="+currentDir,
-			protoFile,
-		)
-
-		output, err := cmd.CombinedOutput()
-		outputStr := string(output)
-
+		outDir := t.TempDir()
+		output, err := runProtoc(outDir, "template_file=/nonexistent/template.tmpl")
 		require.Error(t, err, "Should fail with nonexistent template")
-		assert.Contains(t, outputStr, "file does not exist", "Should report file not found")
+		assert.Contains(t, string(output), "file does not exist", "Should report file not found")
 	})
 
 	t.Run("invalid_template_syntax", func(t *testing.T) {
-		// Create a temporary invalid template
-		tmpDir := t.TempDir()
-		invalidTemplate := filepath.Join(tmpDir, "invalid.tmpl")
-		err := os.WriteFile(invalidTemplate, []byte("{{ invalid syntax"), 0644)
+		invalidTemplate := filepath.Join(t.TempDir(), "invalid.tmpl")
+		err := os.WriteFile(invalidTemplate, []byte("{{ invalid syntax"), 0o644)
 		require.NoError(t, err)
 
-		pluginPath := filepath.Join(currentDir, "protoc-gen-redact")
-
-		// Try to use invalid template
-		cmd := exec.Command("protoc",
-			"--experimental_allow_proto3_optional",
-			"--plugin=protoc-gen-redact="+pluginPath,
-			"--redact_out="+currentDir,
-			"--redact_opt=template_file="+invalidTemplate+",paths=source_relative",
-			"-I="+currentDir,
-			protoFile,
-		)
-
-		output, err := cmd.CombinedOutput()
-		outputStr := string(output)
-
+		outDir := t.TempDir()
+		output, err := runProtoc(outDir, "template_file="+invalidTemplate)
 		require.Error(t, err, "Should fail with invalid template")
-		assert.Contains(t, outputStr, "failed to parse template", "Should report parse error")
+		assert.Contains(t, string(output), "failed to parse template", "Should report parse error")
 	})
 
 	t.Run("template_too_large", func(t *testing.T) {
-		// Create a template that's too large (> 10MB)
-		tmpDir := t.TempDir()
-		largeTemplate := filepath.Join(tmpDir, "large.tmpl")
-
-		// Create a 11MB file
+		largeTemplate := filepath.Join(t.TempDir(), "large.tmpl")
 		largeContent := make([]byte, 11*1024*1024)
 		for i := range largeContent {
 			largeContent[i] = 'a'
 		}
-		err := os.WriteFile(largeTemplate, largeContent, 0644)
+		err := os.WriteFile(largeTemplate, largeContent, 0o644)
 		require.NoError(t, err)
 
-		pluginPath := filepath.Join(currentDir, "protoc-gen-redact")
-
-		// Try to use large template
-		cmd := exec.Command("protoc",
-			"--experimental_allow_proto3_optional",
-			"--plugin=protoc-gen-redact="+pluginPath,
-			"--redact_out="+currentDir,
-			"--redact_opt=template_file="+largeTemplate+",paths=source_relative",
-			"-I="+currentDir,
-			protoFile,
-		)
-
-		output, err := cmd.CombinedOutput()
-		outputStr := string(output)
-
+		outDir := t.TempDir()
+		output, err := runProtoc(outDir, "template_file="+largeTemplate)
 		require.Error(t, err, "Should fail with oversized template")
-		assert.Contains(t, outputStr, "too large", "Should report size error")
+		assert.Contains(t, string(output), "too large", "Should report size error")
 	})
 
 	t.Run("relative_path_template", func(t *testing.T) {
-		// Test with relative path
-		pluginPath := "./protoc-gen-redact"
-		templatePath := "./examples/custom-template.tmpl"
-
+		// 模板路径保持相对形式(相对进程工作目录解析),输出仍进临时目录。
+		outDir := t.TempDir()
 		cmd := exec.Command("protoc",
 			"--experimental_allow_proto3_optional",
 			"--plugin=protoc-gen-redact="+pluginPath,
-			"--redact_out="+currentDir,
-			"--redact_opt=template_file="+templatePath+",paths=source_relative",
+			"--redact_out="+outDir,
+			"--redact_opt=template_file=./examples/custom-template.tmpl,paths=source_relative",
 			"-I="+currentDir,
 			protoFile,
 		)
 		cmd.Dir = currentDir
 
 		output, err := cmd.CombinedOutput()
-		if err != nil {
-			t.Logf("protoc output: %s", string(output))
-		}
-		require.NoError(t, err, "Should work with relative paths")
+		require.NoError(t, err, "Should work with relative paths: %s", string(output))
 	})
 }
 

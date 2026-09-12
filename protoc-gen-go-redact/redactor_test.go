@@ -6,6 +6,8 @@ import (
 	pgs "github.com/lyft/protoc-gen-star/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/tx7do/go-wind-toolkit/protoc-gen-go-redact/redact/v1"
 )
 
 // TestRedactionDefaults tests the default redaction values for various protobuf types
@@ -251,7 +253,7 @@ func TestRuleInformation(t *testing.T) {
 				Values: &redact.FieldRules_String_{String_: "custom_value"},
 			},
 			expectedType:       pgs.StringT,
-			expectedValue:      "`custom_value`",
+			expectedValue:      `"custom_value"`,
 			shouldContainValue: true,
 		},
 		{
@@ -260,7 +262,7 @@ func TestRuleInformation(t *testing.T) {
 				Values: &redact.FieldRules_Bytes{Bytes: []byte("test_bytes")},
 			},
 			expectedType:       pgs.BytesT,
-			expectedValue:      "[]byte(`test_bytes`)",
+			expectedValue:      `[]byte("test_bytes")`,
 			shouldContainValue: true,
 		},
 		{

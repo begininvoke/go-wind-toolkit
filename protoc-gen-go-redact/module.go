@@ -427,12 +427,13 @@ func _redactCondCheck(envVar, envVal string) bool {
 			// Message will be set to nil, ignoring all field level rules
 		{{- else }}
 			if x == nil { return }
-			{{- range $field := $msg.Fields }}
-				{{ if $field.Redact }}
-					// Redacting field: {{ $field.Name }}
-					{{- if $field.IsCondition }}
-						if _redactCondCheck({{ $field.CondEnvVar }}, {{ $field.CondEnvVal }}) {
-					{{- end }}
+				{{- range $field := $msg.Fields }}
+					{{ if $field.Redact }}
+						// Redacting field: {{ $field.Name }}
+						{{- if $field.IsCondition }}
+						// 嵌套条件守卫:整条祖先链的 env 检查须全部满足。
+						if {{ range $i, $c := $field.CondEnvChecks }}{{ if $i }} && {{ end }}_redactCondCheck({{ $c.Var }}, {{ $c.Val }}){{ end }} {
+						{{- end }}
 					{{- if $field.IsRegex }}
 						{{- if $field.IsOptional }}
 							if x.{{ $field.Name }} != nil {
@@ -607,12 +608,13 @@ func _redactCondCheck(envVar, envVal string) bool {
 				{{- if $oneof.HasRedactableFields }}
 				// Redacting oneof: {{ $oneof.Name }}
 				switch v := x.{{ $oneof.Name }}.(type) {
-				{{- range $field := $oneof.Fields }}
-					{{- if $field.Redact }}
-					case *{{ $field.WrapperTypeName }}:
-						{{- if $field.IsCondition }}
-							if _redactCondCheck({{ $field.CondEnvVar }}, {{ $field.CondEnvVal }}) {
-						{{- end }}
+					{{- range $field := $oneof.Fields }}
+						{{- if $field.Redact }}
+						case *{{ $field.WrapperTypeName }}:
+							{{- if $field.IsCondition }}
+							// 嵌套条件守卫:整条祖先链的 env 检查须全部满足。
+							if {{ range $i, $c := $field.CondEnvChecks }}{{ if $i }} && {{ end }}_redactCondCheck({{ $c.Var }}, {{ $c.Val }}){{ end }} {
+							{{- end }}
 						{{- if $field.IsRegex }}
 							v.{{ $field.Name }} = {{ $field.RegexVarName }}.ReplaceAllString(v.{{ $field.Name }}, {{ $field.RegexReplacement }})
 						{{- else if $field.IsMask }}

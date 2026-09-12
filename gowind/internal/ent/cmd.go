@@ -128,6 +128,8 @@ func generateEnt(serviceRootPath string) error {
 		"--feature", "sql/modifier",
 		"--feature", "sql/upsert",
 		"--feature", "sql/lock",
+		// 生成 migrate 包的版本化迁移 API(NamedDiff),供 gow migrate --versioned 使用。
+		"--feature", "sql/versioned-migration",
 	)
 }
 

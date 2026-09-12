@@ -48,6 +48,9 @@ func LoadConfig() *Config {
 	if saved.APIKey != "" {
 		cfg.APIKey = saved.APIKey
 	}
+	if saved.AzureAPIVersion != "" {
+		cfg.AzureAPIVersion = saved.AzureAPIVersion
+	}
 	if saved.Model != "" {
 		cfg.Model = saved.Model
 	}

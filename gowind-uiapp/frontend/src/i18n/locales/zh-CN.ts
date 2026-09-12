@@ -428,6 +428,8 @@ export default {
       provider: '服务商',
       baseUrl: 'API 地址',
       baseUrlPlaceholder: '例如: https://api.openai.com/v1',
+      azureApiVersion: 'Azure api-version (Azure 专用)',
+      azureApiVersionPlaceholder: '例如: 2024-02-01',
       apiKey: 'API 密钥',
       apiKeyPlaceholder: '输入 API Key',
       model: '模型',

@@ -401,6 +401,8 @@ export default {
       provider: 'Provider',
       baseUrl: 'API URL',
       baseUrlPlaceholder: 'e.g.: https://api.openai.com/v1',
+      azureApiVersion: 'Azure api-version (Azure only)',
+      azureApiVersionPlaceholder: 'e.g.: 2024-02-01',
       apiKey: 'API Key',
       apiKeyPlaceholder: 'Enter API Key',
       model: 'Model',

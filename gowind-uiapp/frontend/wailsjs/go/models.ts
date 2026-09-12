@@ -20,19 +20,21 @@ export namespace ai {
 	    provider: string;
 	    baseUrl: string;
 	    apiKey: string;
+	    azureApiVersion?: string;
 	    model: string;
 	    temperature: number;
 	    maxTokens: number;
-	
+
 	    static createFrom(source: any = {}) {
 	        return new Config(source);
 	    }
-	
+
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = source["provider"];
 	        this.baseUrl = source["baseUrl"];
 	        this.apiKey = source["apiKey"];
+	        this.azureApiVersion = source["azureApiVersion"];
 	        this.model = source["model"];
 	        this.temperature = source["temperature"];
 	        this.maxTokens = source["maxTokens"];

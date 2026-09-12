@@ -2,12 +2,13 @@ package ai
 
 // Config AI 服务配置
 type Config struct {
-	Provider    string  `json:"provider"`    // "openai", "azure", "ollama", "deepseek", "custom"
-	BaseURL     string  `json:"baseUrl"`     // API 基础地址
-	APIKey      string  `json:"apiKey"`      // API 密钥
-	Model       string  `json:"model"`       // 模型名称
-	Temperature float64 `json:"temperature"` // 温度参数 (0.0-2.0)
-	MaxTokens   int     `json:"maxTokens"`   // 最大 token 数
+	Provider        string  `json:"provider"`                  // "openai", "azure", "anthropic", "gemini", "ollama", "deepseek", "custom"
+	BaseURL         string  `json:"baseUrl"`                   // API 基础地址
+	APIKey          string  `json:"apiKey"`                    // API 密钥
+	AzureAPIVersion string  `json:"azureApiVersion,omitempty"` // Azure OpenAI 部署的 api-version(仅 provider=azure 生效)
+	Model           string  `json:"model"`                     // 模型名称
+	Temperature     float64 `json:"temperature"`               // 温度参数 (0.0-2.0)
+	MaxTokens       int     `json:"maxTokens"`                 // 最大 token 数
 }
 
 // DefaultConfig 返回默认配置
@@ -47,6 +48,8 @@ func GetProviderPresets() []AIProviderPreset {
 	return []AIProviderPreset{
 		{Name: "OpenAI", Value: "openai", BaseURL: "https://api.openai.com/v1"},
 		{Name: "DeepSeek", Value: "deepseek", BaseURL: "https://api.deepseek.com/v1"},
+		{Name: "Anthropic", Value: "anthropic", BaseURL: "https://api.anthropic.com"},
+		{Name: "Gemini", Value: "gemini", BaseURL: "https://generativelanguage.googleapis.com"},
 		{Name: "Ollama (Local)", Value: "ollama", BaseURL: "http://localhost:11434/v1"},
 		{Name: "Azure OpenAI", Value: "azure", BaseURL: "https://YOUR_RESOURCE.openai.azure.com/openai"},
 		{Name: "Custom", Value: "custom", BaseURL: ""},

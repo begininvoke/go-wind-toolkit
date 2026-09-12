@@ -16,9 +16,10 @@ var aiCmd = &cobra.Command{
 }
 
 func addAIFlags(cmd *cobra.Command) {
-	cmd.Flags().String("provider", "", "AI 服务商: openai | deepseek | ollama | azure | custom（环境变量 GOWIND_AI_PROVIDER）")
+	cmd.Flags().String("provider", "", "AI 服务商: openai | deepseek | anthropic | gemini | ollama | azure | custom（环境变量 GOWIND_AI_PROVIDER）")
 	cmd.Flags().String("base-url", "", "API 基础地址（环境变量 GOWIND_AI_BASE_URL）")
 	cmd.Flags().String("api-key", "", "API 密钥（环境变量 GOWIND_AI_API_KEY）")
+	cmd.Flags().String("azure-api-version", "", "Azure OpenAI 部署的 api-version（环境变量 GOWIND_AI_AZURE_API_VERSION）")
 	cmd.Flags().String("model", "", "模型名称（环境变量 GOWIND_AI_MODEL）")
 	cmd.Flags().Float64("temperature", 0.7, "温度参数 (0.0-2.0)")
 	cmd.Flags().Int("max-tokens", 0, "最大 token 数")
@@ -36,6 +37,9 @@ func buildAIService(cmd *cobra.Command) *ai.Service {
 	}
 	if v := flagString(cmd, "api-key", envOr("GOWIND_AI_API_KEY", "")); v != "" {
 		cfg.APIKey = v
+	}
+	if v := flagString(cmd, "azure-api-version", envOr("GOWIND_AI_AZURE_API_VERSION", "")); v != "" {
+		cfg.AzureAPIVersion = v
 	}
 	if v := flagString(cmd, "model", envOr("GOWIND_AI_MODEL", "")); v != "" {
 		cfg.Model = v

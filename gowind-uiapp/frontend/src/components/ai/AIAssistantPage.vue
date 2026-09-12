@@ -80,6 +80,7 @@ interface AIConfigData {
   provider: string
   baseUrl: string
   apiKey: string
+  azureApiVersion: string
   model: string
   temperature: number
   maxTokens: number
@@ -89,6 +90,7 @@ const aiConfig = reactive<AIConfigData>({
   provider: 'openai',
   baseUrl: 'https://api.openai.com/v1',
   apiKey: '',
+  azureApiVersion: '',
   model: 'gpt-4o',
   temperature: 0.7,
   maxTokens: 4096,
@@ -393,6 +395,9 @@ loadAIConfig()
             </a-row>
             <a-form-item :label="t('ai.config.baseUrl')">
               <a-input v-model:value="aiConfig.baseUrl" :placeholder="t('ai.config.baseUrlPlaceholder')"/>
+            </a-form-item>
+            <a-form-item v-if="aiConfig.provider === 'azure'" :label="t('ai.config.azureApiVersion')">
+              <a-input v-model:value="aiConfig.azureApiVersion" :placeholder="t('ai.config.azureApiVersionPlaceholder')"/>
             </a-form-item>
             <a-form-item :label="t('ai.config.apiKey')">
               <a-input-password v-model:value="aiConfig.apiKey" :placeholder="t('ai.config.apiKeyPlaceholder')"/>
